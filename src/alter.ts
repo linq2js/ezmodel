@@ -1,9 +1,11 @@
 import { createDraft, finishDraft } from "immer";
-import { isPromiseLike } from "./utils";
+import { isPlainObject, isPromiseLike } from "./utils";
 
 export type UpdateFn<T> = (value: T) => void;
 
-type AlteringItem = { draft: { value: any } };
+export const IMMUTABLE_PROP = Symbol("immutable");
+
+type AlteringItem = { base: { value: any }; draft: { value: any } };
 
 let alteringItems: Map<UpdateFn<any>, AlteringItem> | undefined;
 
@@ -25,13 +27,50 @@ export const alter = <T>(fn: () => T): T => {
     alteringItems = undefined;
     try {
       items.forEach((item, update) => {
-        const changes = finishDraft(item.draft);
-        update(changes.value);
+        const changed = finishDraft(item.draft);
+        if (changed.value !== item.base.value) {
+          update(
+            containImmutableObject(item.base.value)
+              ? applyChanges(item.base.value, changed.value)
+              : changed.value
+          );
+        }
       });
     } finally {
       items.clear();
     }
   }
+};
+
+const containImmutableObject = (base: any): boolean => {
+  if ((base && isPlainObject(base)) || Array.isArray(base)) {
+    if (base?.[IMMUTABLE_PROP]) return true;
+
+    return Object.keys(base).some((key) => containImmutableObject(base[key]));
+  }
+
+  return false;
+};
+
+const applyChanges = (base: any, changed: any) => {
+  if ((base && isPlainObject(base)) || Array.isArray(base)) {
+    if (changed && typeof changed === "object") {
+      if (base[IMMUTABLE_PROP]) {
+        Object.keys(changed).forEach((key) => {
+          base[key] = applyChanges(base[key], changed[key]);
+        });
+        return base;
+      } else {
+        // only support array/object data types
+        const copy: any = Array.isArray(changed) ? [] : {};
+        Object.keys(changed).forEach((key) => {
+          copy[key] = applyChanges(base[key], changed[key]);
+        });
+        return copy;
+      }
+    }
+  }
+  return changed;
 };
 
 export const getValue = <T>(
@@ -42,7 +81,8 @@ export const getValue = <T>(
   if (alteringItems) {
     let item = alteringItems.get(update);
     if (!item) {
-      item = { draft: createDraft({ value }) };
+      const base = { value };
+      item = { base, draft: createDraft(base) };
       alteringItems.set(update, item);
     }
 

@@ -107,3 +107,21 @@ export const pipe: Pipe = (initial: any, ...functions: AnyFunc[]) =>
 export const isPromiseLike = <T>(value: any): value is Promise<T> => {
   return value && typeof value.then === "function";
 };
+
+export const isPlainObject = (value: any) => {
+  if (typeof value !== "object" || value === null) {
+    return false; // Not an object or is null
+  }
+
+  let proto = Object.getPrototypeOf(value);
+  if (proto === null) {
+    return true; // `Object.create(null)` case
+  }
+
+  let baseProto = proto;
+  while (Object.getPrototypeOf(baseProto) !== null) {
+    baseProto = Object.getPrototypeOf(baseProto);
+  }
+
+  return proto === baseProto;
+};

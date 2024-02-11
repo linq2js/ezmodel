@@ -1,4 +1,4 @@
-import { getValue, setValue } from "./alter";
+import { IMMUTABLE_PROP, getValue, setValue } from "./alter";
 import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
@@ -77,16 +77,13 @@ type PropInfo = StatePropInfo | ActionPropInfo | UnknownPropInfo;
 type PropGetter = (prop: string | symbol) => PropInfo;
 type PropSetter = (prop: string | symbol, value: any) => boolean;
 
-const DISPOSE_PROP = Symbol("dispose");
-const STALE_PROP = Symbol("stale");
-const REFRESH_PROP = Symbol("refresh");
-const DESCRIPTORS_PROP = Symbol("descriptors");
+const MODEL_API_PROP = Symbol("modelApi");
 
 type ModelApi = {
-  [DISPOSE_PROP]?: AnyFunc;
-  [STALE_PROP]?: AnyFunc;
-  [REFRESH_PROP]?: AnyFunc;
-  [DESCRIPTORS_PROP]?: Record<string, PropertyDescriptor>;
+  dispose: AnyFunc;
+  stale: AnyFunc;
+  refresh: AnyFunc;
+  descriptors: Record<string, PropertyDescriptor>;
 };
 
 const createStateProp = <T>(
@@ -410,10 +407,10 @@ export const model: ModelFn = Object.assign(
 
 export const from = <T extends any[]>(...models: T): Extend<T> => {
   const mergedDescriptors = {};
-  models.forEach((model: ModelApi) => {
+  models.forEach((model) => {
     Object.assign(
       mergedDescriptors,
-      model[DESCRIPTORS_PROP] ?? Object.getOwnPropertyDescriptors(model)
+      getModelApi(model)?.descriptors ?? Object.getOwnPropertyDescriptors(model)
     );
   });
   return Object.defineProperties({} as any, mergedDescriptors);
@@ -476,29 +473,26 @@ const createModel = <TInit>(
       }
     });
   };
-  const descriptorsProp: UnknownPropInfo = {
-    type: "unknown",
-    get: () => descriptors,
-  };
   const undefinedProp: UnknownPropInfo = { type: "unknown", get: NOOP };
-  const disposeProp: UnknownPropInfo = {
-    type: "unknown",
-    get: () => dispose,
+  const api = {
+    refresh,
+    stale,
+    dispose,
+    descriptors,
   };
-  const staleProp: UnknownPropInfo = {
+  const apiProp: UnknownPropInfo = {
     type: "unknown",
-    get: () => stale,
+    get: () => api,
   };
-  const refreshProp: UnknownPropInfo = {
+
+  const immutableProp: UnknownPropInfo = {
     type: "unknown",
-    get: () => refresh,
+    get: () => true,
   };
 
   const getProp: PropGetter = (prop) => {
-    if (prop === DISPOSE_PROP) return disposeProp;
-    if (prop === STALE_PROP) return staleProp;
-    if (prop === REFRESH_PROP) return refreshProp;
-    if (prop === DESCRIPTORS_PROP) return descriptorsProp;
+    if (prop === MODEL_API_PROP) return apiProp;
+    if (prop === IMMUTABLE_PROP) return immutableProp;
     if (typeof prop !== "string") return undefinedProp;
     if (!(prop in shape)) return undefinedProp;
 
@@ -586,22 +580,22 @@ export type RefreshFn = {
 
 export const dispose: DisposeFn = (input) => {
   const models = Array.isArray(input) ? input : [input];
-  models.forEach((model: ModelApi) => {
-    model[DISPOSE_PROP]?.();
+  models.forEach((model) => {
+    getModelApi(model)?.dispose();
   });
 };
 
 export const stale: StaleFn = (input, ...args: any[]) => {
   const models = Array.isArray(input) ? input : [input];
-  models.forEach((model: ModelApi) => {
-    model[STALE_PROP]?.(...args);
+  models.forEach((model) => {
+    getModelApi(model)?.stale(...args);
   });
 };
 
 export const refresh: RefreshFn = (input, ...args: any[]) => {
   const models = Array.isArray(input) ? input : [input];
-  models.forEach((model: ModelApi) => {
-    model[REFRESH_PROP]?.(...args);
+  models.forEach((model) => {
+    getModelApi(model)?.refresh(...args);
   });
 };
 
@@ -623,6 +617,10 @@ export const on: OnFn = (
   return cleanup.emit;
 };
 
+const getModelApi = (value: any) => {
+  return value?.[MODEL_API_PROP] as ModelApi | undefined;
+};
+
 export const isModel = (value: any) => {
-  return !!value?.[DISPOSE_PROP];
+  return !!getModelApi(value);
 };

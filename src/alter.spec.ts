@@ -30,4 +30,38 @@ describe("alter", () => {
       company: { address: "new address", website: "xyz" },
     });
   });
+
+  test("nested model 1 level", () => {
+    const child = model({ name: "child" });
+    const parent = model({ child });
+    alter(() => {
+      parent.child.name = "New name";
+    });
+
+    expect(child.name).toBe("New name");
+    expect(parent.child.name).toBe("New name");
+    expect(parent.child).toBe(child);
+  });
+
+  test("nested model: unset", () => {
+    const child = model({ name: "child" });
+    const parent = model({ child });
+    alter(() => {
+      delete (parent as any).child;
+    });
+
+    expect(parent.child).toBeUndefined();
+  });
+
+  test("nested model 2 level", () => {
+    const child = model({ name: "child" });
+    const parent = model({ level1: { level2: { child } } });
+    alter(() => {
+      parent.level1.level2.child.name = "New name";
+    });
+
+    expect(child.name).toBe("New name");
+    expect(parent.level1.level2.child.name).toBe("New name");
+    expect(parent.level1.level2.child).toBe(child);
+  });
 });
