@@ -1,5 +1,5 @@
 import { createDraft, finishDraft } from "immer";
-import { isPlainObject, isPromiseLike } from "./utils";
+import { isPromiseLike } from "./utils";
 
 export type UpdateFn<T> = (value: T) => void;
 
@@ -29,11 +29,12 @@ export const alter = <T>(fn: () => T): T => {
       items.forEach((item, update) => {
         const changed = finishDraft(item.draft);
         if (changed.value !== item.base.value) {
-          update(
-            containImmutableObject(item.base.value)
-              ? applyChanges(item.base.value, changed.value)
-              : changed.value
-          );
+          update(changed.value);
+          // update(
+          //   containImmutableObject(item.base.value)
+          //     ? applyChanges(item.base.value, changed.value)
+          //     : changed.value
+          // );
         }
       });
     } finally {
@@ -42,36 +43,36 @@ export const alter = <T>(fn: () => T): T => {
   }
 };
 
-const containImmutableObject = (base: any): boolean => {
-  if ((base && isPlainObject(base)) || Array.isArray(base)) {
-    if (base?.[IMMUTABLE_PROP]) return true;
+// const containImmutableObject = (base: any): boolean => {
+//   if ((base && isPlainObject(base)) || Array.isArray(base)) {
+//     if (base?.[IMMUTABLE_PROP]) return true;
 
-    return Object.keys(base).some((key) => containImmutableObject(base[key]));
-  }
+//     return Object.keys(base).some((key) => containImmutableObject(base[key]));
+//   }
 
-  return false;
-};
+//   return false;
+// };
 
-const applyChanges = (base: any, changed: any) => {
-  if ((base && isPlainObject(base)) || Array.isArray(base)) {
-    if (changed && typeof changed === "object") {
-      if (base[IMMUTABLE_PROP]) {
-        Object.keys(changed).forEach((key) => {
-          base[key] = applyChanges(base[key], changed[key]);
-        });
-        return base;
-      } else {
-        // only support array/object data types
-        const copy: any = Array.isArray(changed) ? [] : {};
-        Object.keys(changed).forEach((key) => {
-          copy[key] = applyChanges(base[key], changed[key]);
-        });
-        return copy;
-      }
-    }
-  }
-  return changed;
-};
+// const applyChanges = (base: any, changed: any) => {
+//   if ((base && isPlainObject(base)) || Array.isArray(base)) {
+//     if (changed && typeof changed === "object") {
+//       if (base[IMMUTABLE_PROP]) {
+//         Object.keys(changed).forEach((key) => {
+//           base[key] = applyChanges(base[key], changed[key]);
+//         });
+//         return base;
+//       } else {
+//         // only support array/object data types
+//         const copy: any = Array.isArray(changed) ? [] : {};
+//         Object.keys(changed).forEach((key) => {
+//           copy[key] = applyChanges(base[key], changed[key]);
+//         });
+//         return copy;
+//       }
+//     }
+//   }
+//   return changed;
+// };
 
 export const getValue = <T>(
   update: UpdateFn<T>,
