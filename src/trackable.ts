@@ -2,7 +2,7 @@ import { scope } from "./scope";
 import { Listenable } from "./types";
 
 type Tracker = {
-  track: (listenable: Listenable) => void;
+  track: (listenable: Listenable<void>) => void;
 };
 
 /**
@@ -14,7 +14,7 @@ export const trackable = scope(() => {
 
   return {
     listenables: allListenableList,
-    add(...listenables: Listenable[]) {
+    add(...listenables: Listenable<void>[]) {
       const { size } = allListenableList;
       listenables.forEach((listenable) => {
         allListenableList.add(listenable);

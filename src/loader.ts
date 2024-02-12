@@ -4,26 +4,39 @@ import { emitter } from "./emitter";
 import { trackable } from "./trackable";
 import { AnyFunc, AsyncResult, Loader } from "./types";
 
-export const loader = <T>(load: () => Promise<T>): Loader<T> => {
+export const loader = <T>(init: Promise<T> | (() => Promise<T>)): Loader<T> => {
   const onChange = emitter();
   let data: AsyncResult<T> | undefined;
+  let loadFn: () => Promise<T>;
 
-  return {
-    get data() {
-      trackable()?.add(onChange);
+  if (typeof init === "function") {
+    loadFn = init;
+  } else {
+    data = async(init);
+    loadFn = () => init;
+  }
 
-      if (!data) {
-        data = async(load());
+  const load = () => {
+    if (!data) {
+      data = async(loadFn());
+    }
+
+    return data;
+  };
+
+  return Object.assign(
+    (...args: any[]): any => {
+      if (!args.length) {
+        trackable()?.add(onChange);
+
+        return load();
       }
 
-      return data;
-    },
-    set(valueOrReducer) {
-      if (typeof valueOrReducer === "function") {
-        const reducer = valueOrReducer as AnyFunc;
+      if (typeof args[0] === "function") {
+        const reducer = args[0] as AnyFunc;
 
         if (!data) {
-          data = async(load());
+          data = async(loadFn());
         }
 
         if (data.loading) {
@@ -36,16 +49,19 @@ export const loader = <T>(load: () => Promise<T>): Loader<T> => {
           data = async(produce(data.data, reducer) as T);
         }
       } else {
-        data = async(valueOrReducer);
+        data = async(args[0]);
       }
 
       onChange.emit();
     },
-    reload() {
-      if (data) {
+    {
+      stale() {
         data = undefined;
-        onChange.emit();
-      }
-    },
-  };
+      },
+      reload() {
+        data = undefined;
+        return load();
+      },
+    }
+  );
 };

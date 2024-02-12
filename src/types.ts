@@ -52,7 +52,9 @@ export type OnceOptions = { recent?: boolean };
 export type Action<TResult, TArgs extends any[]> = {
   (...args: TArgs): TResult;
   readonly called: number;
-  readonly result: TResult | undefined;
+  readonly result:
+    | (TResult extends Promise<infer R> ? AsyncResult<R> : TResult)
+    | undefined;
   readonly error: any;
   readonly loading: boolean;
   readonly awaited: Awaited<TResult> | undefined;
@@ -61,9 +63,13 @@ export type Action<TResult, TArgs extends any[]> = {
   on(listener: Listener<TArgs>): VoidFunction;
 };
 
-export type Loader<T> = {
-  readonly data: AsyncResult<T>;
-  set(value: T | Promise<T>): void;
-  set(reducer: (prev: T) => any): void;
-  reload(): void;
-};
+export interface Loader<T> {
+  (): AsyncResult<T>;
+  (value: T | Promise<T>): void;
+  (reducer: (prev: T) => any): void;
+  /**
+   * make data as staled but do not notify to subscribers
+   */
+  stale(): void;
+  reload(): AsyncResult<T>;
+}

@@ -7,6 +7,14 @@ describe("basic usages", () => {
     expect(counter.count).toBe(1);
   });
 
+  test("validate", () => {
+    const counter = model(
+      { count: 1 },
+      { rules: { count: (value) => value > 0 } }
+    );
+    expect(() => (counter.count = 0)).toThrow("Invalid count");
+  });
+
   test("mutate property", () => {
     const counter = model({ count: 1 });
     counter.count++;
@@ -126,6 +134,24 @@ describe("basic usages", () => {
     });
     expect(counter.count).toBe(1);
     expect(() => (counter as any)._count).toThrow();
+  });
+});
+
+describe("async", () => {
+  test("working with promises", async () => {
+    const myModel = model({
+      aa: Promise.resolve(true),
+      bb() {
+        return Promise.resolve(2);
+      },
+    });
+
+    expect(myModel.aa.loading).toBeTruthy();
+    await myModel.aa;
+    expect(myModel.aa.loading).toBeFalsy();
+    expect(myModel.bb.result).toBeUndefined();
+    myModel.bb();
+    expect(myModel.bb.result?.loading).toBeTruthy();
   });
 });
 

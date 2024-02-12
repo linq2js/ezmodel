@@ -1,4 +1,4 @@
-import { IMMUTABLE_PROP, getValue, setValue } from "./alter";
+import { getValue, setValue } from "./alter";
 import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
@@ -32,7 +32,8 @@ export type Extend<T> = T extends readonly []
   : T;
 
 export type ModelOptions<T> = {
-  tags?: ModelTag<NoInfer<T>>[];
+  tags?: ModelTag<T>[];
+  rules?: { [key in keyof T]?: (value: Awaited<T[key]>) => void | boolean };
 };
 
 export type StateBase = Record<string, any>;
@@ -44,6 +45,8 @@ export type PublicProps<T> = Omit<
       ...args: infer A
     ) => infer R
       ? Action<R, A>
+      : T[key] extends Promise<infer R>
+      ? AsyncResult<R>
       : T[key];
   },
   "init"
@@ -87,11 +90,12 @@ type ModelApi = {
 };
 
 const createStateProp = <T>(
-  _name: string,
+  name: string,
   getState: () => T,
   computed: boolean,
   shape: any,
-  getProp: PropGetter
+  getProp: PropGetter,
+  validate?: AnyFunc
 ): StatePropInfo => {
   let prev: { value: T } | { error: any } | undefined;
   let thisObject: any;
@@ -172,6 +176,13 @@ const createStateProp = <T>(
     }
   };
 
+  const validateWrapper = validate
+    ? (value: any) => {
+        const result = validate(value);
+        if (result === false) throw new Error(`Invalid ${name}`);
+      }
+    : undefined;
+
   const get = () => {
     ensureValueReady();
     if (prev && "error" in prev) {
@@ -184,6 +195,36 @@ const createStateProp = <T>(
     if (prev && "value" in prev && prev.value === value) {
       return;
     }
+
+    if (isPromiseLike(value)) {
+      const ar = async(value);
+      if (validateWrapper) {
+        if (ar.loading) {
+          value = async(
+            ar.then((resolved) => {
+              validateWrapper(resolved);
+              return resolved;
+            })
+          ) as T;
+        } else if (ar.error) {
+          // no need to validate
+          value = ar as T;
+        } else {
+          // validate resolved value
+          try {
+            validateWrapper?.(ar.data);
+            value = ar as T;
+          } catch (ex) {
+            value = async.reject(ex) as T;
+          }
+        }
+      } else {
+        value = ar as T;
+      }
+    } else {
+      validateWrapper?.(value);
+    }
+
     prev = { value };
     onChange.emit();
   };
@@ -363,6 +404,20 @@ const createModelProxy = <T extends StateBase>(
       if (!setProp) return false;
       return setProp(p, value);
     },
+    /**
+     * this trick to prevent immer tries to make a copy of nested models
+     * ```js
+     * const child = model({ name: 'Ging' })
+     * const parent = model({ child })
+     *
+     * // perform mutation on child
+     * parent.child.name = 'New name' // without this trick immer will create a copy of child
+     * ```
+     * @returns
+     */
+    getPrototypeOf() {
+      return state;
+    },
   });
 };
 
@@ -371,10 +426,10 @@ export type State<T> = T extends () => infer R ? R : T;
 export type ModelFn = {
   strict<TInit>(
     init: TInit,
-    options?: ModelOptions<State<TInit>>
+    options?: NoInfer<ModelOptions<State<TInit>>>
   ): Model<Readonly<State<TInit>>>;
 
-  <TInit>(init: TInit, options?: ModelOptions<State<TInit>>): Model<
+  <TInit>(init: TInit, options?: NoInfer<ModelOptions<State<TInit>>>): Model<
     State<TInit>
   >;
 };
@@ -418,7 +473,7 @@ export const from = <T extends any[]>(...models: T): Extend<T> => {
 
 const createModel = <TInit>(
   init: TInit,
-  { strict, tags }: { strict?: boolean } & ModelOptions<any> = {}
+  { strict, tags, rules }: { strict?: boolean } & ModelOptions<any> = {}
 ): Model<State<TInit>> => {
   const creator = typeof init === "function" ? (init as AnyFunc) : () => init;
 
@@ -432,6 +487,7 @@ const createModel = <TInit>(
     typeof shape.init === "function" ? shape.init : NOOP;
 
   const descriptors = Object.getOwnPropertyDescriptors(shape);
+
   const stale = (props?: string | string[]) => {
     if (props) {
       (Array.isArray(props) ? props : [props]).forEach((prop) => {
@@ -485,14 +541,8 @@ const createModel = <TInit>(
     get: () => api,
   };
 
-  const immutableProp: UnknownPropInfo = {
-    type: "unknown",
-    get: () => true,
-  };
-
   const getProp: PropGetter = (prop) => {
     if (prop === MODEL_API_PROP) return apiProp;
-    if (prop === IMMUTABLE_PROP) return immutableProp;
     if (typeof prop !== "string") return undefinedProp;
     if (!(prop in shape)) return undefinedProp;
 
@@ -502,7 +552,14 @@ const createModel = <TInit>(
       const descriptor = descriptors[prop];
       // computed
       if (descriptor.get) {
-        propInfo = createStateProp(prop, descriptor.get, true, shape, getProp);
+        propInfo = createStateProp(
+          prop,
+          descriptor.get,
+          true,
+          shape,
+          getProp,
+          rules?.[prop]
+        );
       } else {
         const value = descriptor.value;
         // action
@@ -510,7 +567,14 @@ const createModel = <TInit>(
           propInfo = createActionProp(value, writableProxy);
         } else {
           const getState = () => value;
-          propInfo = createStateProp(prop, getState, false, shape, getProp);
+          propInfo = createStateProp(
+            prop,
+            getState,
+            false,
+            shape,
+            getProp,
+            rules?.[prop]
+          );
         }
       }
 

@@ -1,9 +1,23 @@
-import { createDraft, finishDraft } from "immer";
+import { createDraft, finishDraft, produce } from "immer";
+
 import { isPromiseLike } from "./utils";
+import { AnyFunc, NoInfer } from "./types";
+import { async } from "./async";
+
+export type AlterFn = {
+  <T>(fn: () => T): T;
+
+  <T>(
+    model: T,
+    props: NoInfer<{
+      [key in keyof T as T[key] extends AnyFunc ? never : key]?:
+        | T[key]
+        | ((draft: Awaited<T[key]>) => Awaited<T[key]> | void);
+    }>
+  ): T;
+};
 
 export type UpdateFn<T> = (value: T) => void;
-
-export const IMMUTABLE_PROP = Symbol("immutable");
 
 type AlteringItem = { base: { value: any }; draft: { value: any } };
 
@@ -11,10 +25,54 @@ let alteringItems: Map<UpdateFn<any>, AlteringItem> | undefined;
 
 export const isAltering = () => !!alteringItems;
 
-export const alter = <T>(fn: () => T): T => {
+const checkNestedAlterCall = () => {
   if (alteringItems) {
     throw new Error("Nested alter() calls are not permitted");
   }
+};
+
+export const alter: AlterFn = (...args: any[]) => {
+  checkNestedAlterCall();
+
+  if (args.length == 2) {
+    const [model, props] = args;
+    Object.entries(props as Record<string, any>).forEach(([prop, value]) => {
+      if (typeof value === "function") {
+        const reducer = value;
+        const prevValue = model[prop];
+
+        if (isPromiseLike(prevValue)) {
+          const ar = async(prevValue);
+
+          if (ar.loading) {
+            model[prop] = async(
+              prevValue.then((resolved) => {
+                return produce(resolved, reducer);
+              })
+            );
+          } else if (!ar.error) {
+            try {
+              model[prop] = async(produce(ar.data, reducer));
+            } catch (ex) {
+              model[prop] = async.reject(ex);
+            }
+          }
+        } else {
+          try {
+            model[prop] = produce(prevValue, reducer);
+          } catch (ex) {
+            throw ex;
+          }
+        }
+      } else {
+        model[prop] = value;
+      }
+    });
+
+    return model;
+  }
+
+  const fn: AnyFunc = args[0];
   const items = new Map<UpdateFn<any>, AlteringItem>();
   try {
     alteringItems = items;
@@ -30,11 +88,6 @@ export const alter = <T>(fn: () => T): T => {
         const changed = finishDraft(item.draft);
         if (changed.value !== item.base.value) {
           update(changed.value);
-          // update(
-          //   containImmutableObject(item.base.value)
-          //     ? applyChanges(item.base.value, changed.value)
-          //     : changed.value
-          // );
         }
       });
     } finally {
@@ -42,37 +95,6 @@ export const alter = <T>(fn: () => T): T => {
     }
   }
 };
-
-// const containImmutableObject = (base: any): boolean => {
-//   if ((base && isPlainObject(base)) || Array.isArray(base)) {
-//     if (base?.[IMMUTABLE_PROP]) return true;
-
-//     return Object.keys(base).some((key) => containImmutableObject(base[key]));
-//   }
-
-//   return false;
-// };
-
-// const applyChanges = (base: any, changed: any) => {
-//   if ((base && isPlainObject(base)) || Array.isArray(base)) {
-//     if (changed && typeof changed === "object") {
-//       if (base[IMMUTABLE_PROP]) {
-//         Object.keys(changed).forEach((key) => {
-//           base[key] = applyChanges(base[key], changed[key]);
-//         });
-//         return base;
-//       } else {
-//         // only support array/object data types
-//         const copy: any = Array.isArray(changed) ? [] : {};
-//         Object.keys(changed).forEach((key) => {
-//           copy[key] = applyChanges(base[key], changed[key]);
-//         });
-//         return copy;
-//       }
-//     }
-//   }
-//   return changed;
-// };
 
 export const getValue = <T>(
   update: UpdateFn<T>,
