@@ -60,3 +60,10 @@ export type Action<TResult, TArgs extends any[]> = {
   reload(): boolean;
   on(listener: Listener<TArgs>): VoidFunction;
 };
+
+export type Loader<T> = {
+  readonly data: AsyncResult<T>;
+  set(value: T | Promise<T>): void;
+  set(reducer: (prev: T) => any): void;
+  reload(): void;
+};

@@ -408,14 +408,14 @@ const asyncResultProps = <T = any>(
   if (ASYNC_RESULT_PROP in promise) {
     return promise as unknown as AsyncResult<T>;
   }
+  let loading = initialLoading;
+  let error = initialError;
+  let data = initialData;
 
   const ar = Object.assign(promise, {
     [ASYNC_RESULT_PROP]: true,
-    loading: initialLoading,
-    data: initialData,
-    error: initialError,
-    on(listener: VoidFunction) {
-      if (!ar.loading) return NOOP;
+    on(listener: AnyFunc) {
+      if (!loading) return NOOP;
 
       let active = true;
       promise.finally(() => {
@@ -431,18 +431,50 @@ const asyncResultProps = <T = any>(
     },
   });
 
-  if (ar.loading) {
+  Object.defineProperties(ar, {
+    loading: {
+      get() {
+        if (loading) {
+          trackable()?.add(ar);
+        }
+
+        return loading;
+      },
+    },
+    error: {
+      get() {
+        if (loading) {
+          trackable()?.add(ar);
+        }
+
+        return error;
+      },
+    },
+    data: {
+      get() {
+        if (loading) {
+          trackable()?.add(ar);
+        }
+
+        return data;
+      },
+    },
+  });
+
+  if (loading) {
     ar.then(
       (result) => {
-        Object.assign(ar, { data: result, loading: false });
+        data = result;
+        loading = false;
       },
-      (error) => {
-        Object.assign(ar, { error, loading: false });
+      (e) => {
+        error = e;
+        loading = false;
       }
     );
   }
 
-  return ar;
+  return ar as any;
 };
 
 export type AsyncFn = {
