@@ -1,4 +1,4 @@
-import { dispose, refresh, stale, model, from } from "./model";
+import { dispose, refresh, stale, model, from, on } from "./model";
 
 describe("basic usages", () => {
   test("getting value", () => {
@@ -206,6 +206,20 @@ describe("life cycle", () => {
     counter.count1;
     counter.count2;
     expect(log).toHaveBeenCalledTimes(4);
+  });
+
+  test("auto refresh when specified events happened", () => {
+    const events = model({ changed() {} });
+    const values = [1, 2];
+    const my = model({
+      get data() {
+        on(events.changed);
+        return values.shift();
+      },
+    });
+    expect(my.data).toBe(1);
+    events.changed();
+    expect(my.data).toBe(2);
   });
 
   test("refresh", () => {

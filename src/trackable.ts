@@ -26,6 +26,16 @@ export const trackable = scope(() => {
         });
       }
     },
+    onTrack(listener: (listenable: Listenable) => void) {
+      const watcher: Tracker = { track: listener };
+
+      allListenableList.forEach(watcher.track);
+      activeWatchers.add(watcher);
+
+      return () => {
+        activeWatchers.delete(watcher);
+      };
+    },
     track(onChange: VoidFunction) {
       const unsubscribes: VoidFunction[] = [];
       const disposables: VoidFunction[] = [];

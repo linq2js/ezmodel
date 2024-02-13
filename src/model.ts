@@ -97,7 +97,7 @@ type UpdatablePropInfo = PropInfoBase & {
 };
 type StatePropInfo = UpdatablePropInfo & {
   type: "state";
-  stale(): void;
+  stale(notify?: boolean): void;
   refresh(): void;
   hasError(): boolean;
   set(value: any): void;
@@ -170,13 +170,16 @@ const createStateProp = <T>(
 
       try {
         isTracking = true;
-        const [{ listenables }, result] = trackable(() => ({
+        const [{ onTrack }, result] = trackable(() => ({
           value: getState.call(thisObject),
         }));
         prev = result;
-        listenables.forEach((x) => {
+        onTrack((x) => {
           if ("$state" in x) {
             addDependency(x.$state as StatePropInfo);
+          } else {
+            // normal listenable
+            onCleanup.on(x.on(onDependencyChange));
           }
         });
       } catch (error) {
@@ -267,14 +270,18 @@ const createStateProp = <T>(
     set(value: T) {
       return setValue(set, value);
     },
-    stale() {
+    stale(notify?: boolean) {
       if (!prev) return;
       prev = undefined;
       dependencies.forEach((dependency) => {
         if (dependency.hasError()) {
-          dependency.stale();
+          dependency.stale(notify);
         }
       });
+
+      if (notify) {
+        onChange.emit();
+      }
     },
     refresh() {
       if (isComputing) return;
@@ -518,18 +525,35 @@ const createModel = <TInit>(
 
   const descriptors = Object.getOwnPropertyDescriptors(shape);
 
-  const stale = (props?: string | string[]) => {
+  const stale = (...args: any[]) => {
+    let notify = false;
+    let props: string[] | undefined;
+    // OVERLOAD: stale(prop, notify)
+    if (typeof args[0] === "string") {
+      props = [args[0]];
+      notify = args[1];
+    }
+    // OVERLOAD: stale(props, notify)
+    else if (Array.isArray(args[0])) {
+      props = args[0];
+      notify = args[1];
+    }
+    // OVERLOAD: stale(notify)
+    else if (args.length === 1) {
+      notify = args[0];
+    }
+
     if (props) {
       (Array.isArray(props) ? props : [props]).forEach((prop) => {
         const propInfo = propInfoMap.get(prop);
         if (propInfo && "stale" in propInfo) {
-          propInfo.stale();
+          propInfo.stale(notify);
         }
       });
     } else {
       propInfoMap.forEach((propInfo) => {
         if ("stale" in propInfo) {
-          propInfo.stale();
+          propInfo.stale(notify);
         }
       });
     }
@@ -661,9 +685,18 @@ export type DisposeFn = {
 };
 
 export type StaleFn = {
-  <T extends StateBase>(model: T, prop?: keyof NonFunctionProps<T>): void;
-  <T extends StateBase>(model: T, props?: (keyof NonFunctionProps<T>)[]): void;
-  <T extends StateBase>(models: T[]): void;
+  <T extends StateBase>(model: T, notify: boolean): void;
+  <T extends StateBase>(
+    model: T,
+    prop?: keyof NonFunctionProps<T>,
+    notify?: boolean
+  ): void;
+  <T extends StateBase>(
+    model: T,
+    props?: (keyof NonFunctionProps<T>)[],
+    notify?: boolean
+  ): void;
+  <T extends StateBase>(models: T[], notify?: boolean): void;
 };
 
 export type RefreshFn = {
@@ -695,13 +728,31 @@ export const refresh: RefreshFn = (input, ...args: any[]) => {
 
 export type OnFn = {
   (listenables: Listenable<any>[], listener: Listener<any>): VoidFunction;
+
   <T>(listenable: Listenable<T>, listener: Listener<T>): VoidFunction;
+
+  (listenables: Listenable<any>[]): void;
+
+  <T>(listenable: Listenable<T>): void;
 };
 
 export const on: OnFn = (
   listenables: Listenable | Listenable[],
-  listener: Listener
-) => {
+  listener?: Listener
+): any => {
+  if (!listener) {
+    const track = trackable()?.add;
+    if (track) {
+      (Array.isArray(listenables) ? listenables : [listenables]).forEach(
+        (listenable) => {
+          track(listenable);
+        }
+      );
+    }
+
+    return;
+  }
+
   const cleanup = emitter();
   (Array.isArray(listenables) ? listenables : [listenables]).forEach(
     (listenable) => {
