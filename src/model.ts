@@ -718,7 +718,3 @@ const getModelApi = (value: any) => {
 export const isModel = (value: any) => {
   return !!getModelApi(value);
 };
-
-type Todo = {
-  title: string;
-};
