@@ -1,5 +1,5 @@
 import { getValue, setValue } from "./alter";
-import { all, async } from "./async";
+import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
 import { local } from "./local";
