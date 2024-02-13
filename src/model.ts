@@ -56,7 +56,37 @@ export type NonFunctionProps<T> = {
   [key in keyof T as T[key] extends AnyFunc ? never : key]: T[key];
 };
 
-export type Model<T> = T extends StateBase ? PublicProps<T> : never;
+export const MODEL = Symbol("model");
+
+export type Model<T> = T extends StateBase
+  ? PublicProps<T> & {
+      /**
+       * This is trick for Typescript checking
+       * Sometimes you need to pass model as mutable object, it is not safe if you do below
+       * ```ts
+       * // DON'T
+       * const updateTodo = (todo: Todo, newTitle: string) => {
+       *  // we cannot ensure the todo object is modal or plain object
+       *  // so changing model prop does not trigger any reactive effect
+       *  todo.title = newTitle
+       * }
+       * const todoObject = { title: 'abc' })
+       * const todoModel = model({ title: 'abc' }))
+       * updateTodo(todoObject; // No error
+       * updateTodo(todoModel; // No error
+       *
+       * // DO
+       * const updateTodo = (todo: Model<Todo>) => {
+       *  todo.title = newTitle
+       * }
+       *
+       * updateTodo(todoObject; // Typescript error: Property '[MODEL]'  is missing in type Todo
+       * updateTodo(todoModel; // No error
+       * ```
+       */
+      [MODEL]: true;
+    }
+  : never;
 
 type PropInfoBase = {
   get(): any;
@@ -687,4 +717,8 @@ const getModelApi = (value: any) => {
 
 export const isModel = (value: any) => {
   return !!getModelApi(value);
+};
+
+type Todo = {
+  title: string;
 };
