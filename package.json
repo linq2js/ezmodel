@@ -7,9 +7,9 @@
   "scripts": {
     "build": "tsc && vite build",
     "test": "jest --detectOpenHandles",
-    "publish:patch": "yarn publish:pre && npm version patch",
-    "publish:minor": "yarn publish:pre && npm version minor",
-    "publish:major": "yarn publish:pre && npm version major",
+    "publish:patch": "yarn publish:pre && npm version patch && git push",
+    "publish:minor": "yarn publish:pre && npm version minor && git push",
+    "publish:major": "yarn publish:pre && npm version major && git push",
     "publish:pre": "yarn test && yarn build"
   },
   "files": [
