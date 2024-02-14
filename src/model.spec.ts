@@ -1,3 +1,4 @@
+import { alter } from "./alter";
 import { filter } from "./emitter";
 import { from } from "./from";
 import { dispose, refresh, stale, model } from "./model";
@@ -59,6 +60,28 @@ describe("basic usages", () => {
     const app = model(from({ aa: () => 1, bb: () => 2 }));
     expect(app.aa).toBe(1);
     expect(app.bb).toBe(2);
+  });
+
+  test("custom setter", () => {
+    const app = model({
+      todos: [{ done: true }, { done: false }],
+      get allDone() {
+        return this.todos.every((x) => x.done);
+      },
+      set allDone(value) {
+        alter(() => {
+          this.todos.forEach((x) => (x.done = value));
+        });
+      },
+    });
+
+    expect(app.allDone).toBeFalsy();
+    app.allDone = true;
+    expect(app.allDone).toBeTruthy();
+    app.allDone = false;
+    expect(app.allDone).toBeFalsy();
+    expect(app.todos[0].done).toBeFalsy();
+    expect(app.todos[1].done).toBeFalsy();
   });
 
   test("multiple inheritance", () => {

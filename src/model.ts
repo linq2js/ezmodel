@@ -109,7 +109,8 @@ const createStateProp = <T>(
   computed: boolean,
   shape: any,
   getProp: PropGetter,
-  validate?: AnyFunc
+  validate?: AnyFunc,
+  customSet?: (value: T) => void
 ): StatePropInfo => {
   let prev: { value: T } | { error: any } | undefined;
   let thisObject: any;
@@ -209,6 +210,11 @@ const createStateProp = <T>(
   };
 
   const set = (value: T) => {
+    if (customSet) {
+      customSet?.(value);
+      return;
+    }
+
     if (prev && "value" in prev && prev.value === value) {
       return;
     }
@@ -585,19 +591,33 @@ const createModel = <TInit>(
     let propInfo = propInfoMap.get(prop);
 
     if (!propInfo) {
-      const descriptor = descriptors[prop];
+      const { get, set, value } = descriptors[prop];
       // computed
-      if (descriptor.get) {
-        propInfo = createStateProp(
-          prop,
-          descriptor.get,
-          true,
-          shape,
-          getProp,
-          rules?.[prop]
-        );
+      if (get) {
+        // has custom setter
+        if (set) {
+          propInfo = createStateProp(
+            prop,
+            get,
+            true,
+            shape,
+            getProp,
+            rules?.[prop],
+            (value) => {
+              set.call(writableProxy, value);
+            }
+          );
+        } else {
+          propInfo = createStateProp(
+            prop,
+            get,
+            true,
+            shape,
+            getProp,
+            rules?.[prop]
+          );
+        }
       } else {
-        const value = descriptor.value;
         // action
         if (typeof value === "function") {
           propInfo = createActionProp(value, writableProxy);
