@@ -1,7 +1,7 @@
 import { trackable } from "./trackable";
 import { local } from "./local";
 import { disposable } from "./disposable";
-import { NOOP } from "./utils";
+import { NOOP, shallow } from "./utils";
 
 export type Effect = (context: EffectContext) => void | VoidFunction;
 
@@ -14,22 +14,37 @@ export type EffectContext = {
   readonly count: number;
 };
 
+export type EffectFn = {
+  (fn: Effect, hof?: EffectRunHOF): VoidFunction;
+  (fn: Effect, deps: any[]): VoidFunction;
+};
+
 /**
  *
  * @param fn
  * @param hof High Order Function for effect run
  * @returns
  */
-export const effect = (fn: Effect, hof?: EffectRunHOF): VoidFunction => {
+export const effect: EffectFn = (fn: Effect, extra?: any) => {
   const localEffect = local()?.get("effect");
 
   if (localEffect) {
+    const deps = Array.isArray(extra) ? extra : [];
+    // there is prev effect
+    if (localEffect.dispose) {
+      // deps changed
+      if (shallow(localEffect.value, deps)) {
+        return localEffect.dispose;
+      }
+    }
     localEffect.dispose?.();
-    localEffect.dispose = createEffect(fn, hof);
+    localEffect.value = deps;
+    localEffect.dispose = createEffect(fn);
+
     return localEffect.dispose;
   }
 
-  return createEffect(fn, hof);
+  return createEffect(fn, typeof extra === "function" ? extra : undefined);
 };
 
 const createEffect = (fn: Effect, hof?: EffectRunHOF) => {

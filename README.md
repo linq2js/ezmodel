@@ -184,6 +184,24 @@ counter.increment(); // OK
 
 ### Adding side effects
 
+Utilize `effect()` to automatically respond to changes in your models. The effects are intended for final-stage logic, such as updating the document title or saving data to LocalStorage. view is a unique auto effect specifically designed for rendering purposes. `You must not do any model mutations inside effects`.
+
+```js
+import { model, effect } from "ezmodel";
+
+const counter = model({ count: 1 });
+
+// effect is triggered immediately after creation
+// count: 1
+const removeEffect = effect(() => {
+  console.log(`count: ${counter.count}`);
+});
+
+counter.count++; // count: 2
+removeEffect(); // effect is removed
+counter.count++; // no log
+```
+
 ### Handling async data
 
 ### Multiple inheritance

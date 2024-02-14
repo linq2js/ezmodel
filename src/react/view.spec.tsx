@@ -76,7 +76,7 @@ describe("view", () => {
       }));
 
       effect(() => {
-        counter.count;
+        log(`count:${counter.count}`);
 
         return () => {
           log("dispose effect");
@@ -111,10 +111,10 @@ describe("view", () => {
     unmount();
 
     expect(log.mock.calls).toEqual([
-      ["dispose effect"],
-      ["dispose effect"],
-      ["dispose effect"],
-      ["dispose effect"],
+      ["count:0"],
+      ["count:1"],
+      ["count:2"],
+      ["count:3"],
       ["dispose model"],
       ["dispose effect"],
     ]);
