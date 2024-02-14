@@ -52,6 +52,7 @@ export type OnceOptions = { recent?: boolean };
 export type Action<TResult, TArgs extends any[]> = {
   (...args: TArgs): TResult;
   readonly called: number;
+  readonly prevResult: TResult | undefined;
   readonly result:
     | (TResult extends Promise<infer R> ? AsyncResult<R> : TResult)
     | undefined;

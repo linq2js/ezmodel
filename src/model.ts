@@ -307,7 +307,8 @@ const createActionProp = <T, A extends any[]>(
   dispatch: (...args: A) => T,
   proxy: T
 ): ActionPropInfo => {
-  let prev:
+  let prevResult: T | undefined;
+  let current:
     | {
         count: number;
         args: A;
@@ -325,34 +326,37 @@ const createActionProp = <T, A extends any[]>(
   const action = Object.assign(
     (...args: A) => {
       onDispatch.emit(args);
-      prev = { count: (prev?.count ?? 0) + 1, args };
+      current = { count: (current?.count ?? 0) + 1, args };
       try {
-        prev.result = dispatch.apply(proxy, args);
-        if (isPromiseLike(prev.result)) {
-          prev.result = async(prev.result) as T;
+        current.result = dispatch.apply(proxy, args);
+        if (isPromiseLike(current.result)) {
+          current.result = async(current.result) as T;
         }
       } catch (ex) {
-        prev.error = ex;
+        current.error = ex;
       }
+
+      prevResult = current.result;
+
       onChange.emit();
-      if (prev.error) {
-        throw prev.error;
+      if (current.error) {
+        throw current.error;
       }
-      return prev.result;
+      return current.result;
     },
     {
       on: onDispatch.on,
       reload() {
-        if (!prev) return false;
-        action(...prev.args);
+        if (!current) return false;
+        action(...current.args);
         return true;
       },
       load(...args: A) {
-        if (prev && prev.args.every((x, i) => x === args[i])) {
-          if (prev.error) {
-            throw prev.error;
+        if (current && current.args.every((x, i) => x === args[i])) {
+          if (current.error) {
+            throw current.error;
           }
-          return prev.result;
+          return current.result;
         }
         return action(...args);
       },
@@ -365,8 +369,8 @@ const createActionProp = <T, A extends any[]>(
   ): S | A => {
     const track = trackable()?.add;
     track?.(onChange);
-    if (isPromiseLike(prev?.result)) {
-      const ar = async(prev.result);
+    if (isPromiseLike(current?.result)) {
+      const ar = async(current.result);
       if (ar.loading) {
         track?.(ar);
       }
@@ -374,14 +378,19 @@ const createActionProp = <T, A extends any[]>(
       return asyncResolver(ar);
     }
 
-    return syncResolver(prev?.result, prev?.error);
+    return syncResolver(current?.result, current?.error);
   };
 
   Object.defineProperties(action, {
+    prevResult: {
+      get() {
+        return prevResult;
+      },
+    },
     called: {
       get() {
         trackable()?.add(onChange);
-        return prev?.count ?? 0;
+        return current?.count ?? 0;
       },
     },
     loading: {
@@ -403,7 +412,7 @@ const createActionProp = <T, A extends any[]>(
     result: {
       get() {
         trackable()?.add(onChange);
-        return prev?.result;
+        return current?.result;
       },
     },
     error: {
