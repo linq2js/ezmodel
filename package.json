@@ -11,7 +11,8 @@
     "publish:patch": "yarn publish:pre && npm version patch && yarn publish:push",
     "publish:minor": "yarn publish:pre && npm version minor && yarn publish:push",
     "publish:major": "yarn publish:pre && npm version major && yarn publish:push",
-    "publish:pre": "yarn test && yarn build"
+    "publish:pre": "yarn test && yarn build",
+    "postpublish": "rimraf react"
   },
   "files": [
     "dist",
@@ -47,7 +48,8 @@
     "tslib": "^2.6.2",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
-    "immer": "10.0.3"
+    "immer": "10.0.3",
+    "rimraf": "5.0.5"
   },
   "dependencies": {
     "@wry/equality": "^0.5.7"

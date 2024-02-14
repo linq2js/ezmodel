@@ -11,7 +11,7 @@ export type AlterFn = {
     model: T,
     props: NoInfer<{
       [key in keyof T as T[key] extends AnyFunc ? never : key]?:
-        | T[key]
+        | (T[key] extends Promise<infer R> ? Promise<R> : T[key])
         | ((draft: Awaited<T[key]>) => Awaited<T[key]> | void);
     }>
   ): T;
