@@ -15,22 +15,6 @@ import {
 } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
-export type Override<B, D> = {
-  [key in keyof B | keyof D]: key extends keyof D
-    ? D[key]
-    : key extends keyof B
-    ? B[key]
-    : never;
-};
-
-export type Extend<T> = T extends readonly []
-  ? {}
-  : T extends readonly [infer F, ...infer R]
-  ? Override<F, Extend<R>>
-  : T extends any[]
-  ? {}
-  : T;
-
 export type ModelOptions<T> = {
   tags?: ModelTag<T>[];
   rules?: { [key in keyof T]?: (value: Awaited<T[key]>) => void | boolean };
@@ -506,17 +490,6 @@ export const model: ModelFn = Object.assign(
   }
 );
 
-export const from = <T extends any[]>(...models: T): Extend<T> => {
-  const mergedDescriptors = {};
-  models.forEach((model) => {
-    Object.assign(
-      mergedDescriptors,
-      getModelApi(model)?.descriptors ?? Object.getOwnPropertyDescriptors(model)
-    );
-  });
-  return Object.defineProperties({} as any, mergedDescriptors);
-};
-
 const createModel = <TInit>(
   init: TInit,
   { strict, tags, rules }: { strict?: boolean } & ModelOptions<any> = {}
@@ -764,7 +737,7 @@ export const on: OnFn = (
   return cleanup.emit;
 };
 
-const getModelApi = (value: any) => {
+export const getModelApi = (value: any) => {
   return value?.[MODEL_API_PROP] as ModelApi | undefined;
 };
 

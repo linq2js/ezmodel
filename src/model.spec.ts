@@ -1,5 +1,6 @@
 import { filter } from "./emitter";
-import { dispose, refresh, stale, model, from } from "./model";
+import { from } from "./from";
+import { dispose, refresh, stale, model } from "./model";
 
 describe("basic usages", () => {
   test("getting value", () => {
@@ -46,6 +47,18 @@ describe("basic usages", () => {
     expect(counter.increment.called).toBe(1);
     expect(counter.increment.result).toBe(true);
     expect(counter.count).toBe(2);
+  });
+
+  test("build props from getter", () => {
+    const app = model(from(["aa", "bb"], (prop) => prop.toUpperCase()));
+    expect(app.aa).toBe("AA");
+    expect(app.bb).toBe("BB");
+  });
+
+  test("build props from getter map", () => {
+    const app = model(from({ aa: () => 1, bb: () => 2 }));
+    expect(app.aa).toBe(1);
+    expect(app.bb).toBe(2);
   });
 
   test("multiple inheritance", () => {
