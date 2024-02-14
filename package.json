@@ -19,10 +19,12 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "typings": "./dist/index.d.ts"
     },
     "./react": {
-      "import": "./dist/react/index.js"
+      "import": "./dist/react/index.js",
+      "typings": "./dist/react/index.d.ts"
     }
   },
   "peerDependencies": {
