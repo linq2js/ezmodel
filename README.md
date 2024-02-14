@@ -70,9 +70,9 @@ const CharacterInfo = view(() => {
   return <div>{character.name}</div>;
 });
 
-// changing character age does not trigger reactive effect
+// Modifying the character's age does not activate the reactive effect.
 character.age = 40;
-// the CharacterInfo will re-render when character name has been changed only
+// The CharacterInfo will re-render only when the character's name has been changed.
 character.name = "Ging Freecss";
 ```
 
@@ -101,7 +101,7 @@ Computed model properties are a feature that allows us to declare a property who
 ```js
 const counter = model({
   count: 1,
-  // the doubledCount property consumes count property. When the count property changed, the doubledCount property will re-compute as well
+  // The doubledCount property utilizes the count property. When the count property changes, the doubledCount property will also re-compute.
   get doubledCount() {
     return this.count * 2;
   },
@@ -110,7 +110,7 @@ const counter = model({
 const a = model({ value: 1 });
 const b = model({ value: 2 });
 const sum = model({
-  // the computed property can also consume properties from other models
+  // The computed property can also utilize properties from other models.
   get value() {
     return a.value + b.value;
   },
@@ -127,17 +127,60 @@ const my = model({
   },
 });
 
-// at this time, doHeavyComputation is not executed yet
+// At this time, `doHeavyComputation` has not been executed yet.
 console.log(my.otherValue);
-// the doHeavyComputation is called until there is access to
+// `doHeavyComputation` is called only when there is access to it.
 console.log(my.doHeavyComputation);
-// and the result is cached for next access
+// And the result is cached for subsequent access.
 console.log(my.doHeavyComputation);
 console.log(my.doHeavyComputation);
 console.log(my.doHeavyComputation);
 ```
 
+To force `ezmodel` to re-compute the values of computed properties, we can use the `refresh()` or `stale()` functions.
+
+```js
+import { refresh, stale } from "ezmodel";
+
+const app = model({
+  get todos() {
+    return fetch("https://jsonplaceholder.typicode.com/todos").then((res) =>
+      res.json()
+    );
+  },
+  get user() {
+    return fetch("https://jsonplaceholder.typicode.com/users/1").then((res) =>
+      res.json()
+    );
+  },
+});
+
+// re-compute immediately
+refresh(app, "todos");
+// mark todos property as stale, the computation will be executed for subsequent access of app.todos
+stale(app, "todos");
+
+// refresh todos and user properties
+refresh(app, ["todos", "user"]);
+```
+
 ### Strict mode
+
+With Strict mode, all model properties become readonly, and modifying property values is only permitted within model methods. External modifications outside of model methods are prohibited. This encapsulates/centralizes the logic within model methods, avoiding scattered model mutations across various locations.
+
+```js
+// using strict mode with model.strict
+const counter = model.strict({
+  count: 1,
+  increment() {
+    this.count++;
+  },
+});
+
+// getting error if trying to modify count property outside model method
+counter.count++; // get Typescript error
+counter.increment(); // OK
+```
 
 ### Adding side effects
 
@@ -149,13 +192,11 @@ console.log(my.doHeavyComputation);
 
 ### Listening action dispatches
 
+### Validating model properties
+
 ### Fine-grained reactivity
 
 ### Tagging models
-
-### Staling model props
-
-### Refreshing model props
 
 ## API References
 
