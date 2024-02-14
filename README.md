@@ -120,7 +120,7 @@ const sum = model({
 Computed properties can include complex calculations that are only executed when the computed property is accessed. Additionally, computed properties memoize the results for subsequent accesses, preventing the calculation function from being called again.
 
 ```js
-const my = model({
+const app = model({
   otherValue: 1,
   get doHeavyComputation() {
     return something;
@@ -128,13 +128,13 @@ const my = model({
 });
 
 // At this time, `doHeavyComputation` has not been executed yet.
-console.log(my.otherValue);
+console.log(app.otherValue);
 // `doHeavyComputation` is called only when there is access to it.
-console.log(my.doHeavyComputation);
+console.log(app.doHeavyComputation);
 // And the result is cached for subsequent access.
-console.log(my.doHeavyComputation);
-console.log(my.doHeavyComputation);
-console.log(my.doHeavyComputation);
+console.log(app.doHeavyComputation);
+console.log(app.doHeavyComputation);
+console.log(app.doHeavyComputation);
 ```
 
 To force `ezmodel` to re-compute the values of computed properties, we can use the `refresh()` or `stale()` functions.
@@ -184,9 +184,11 @@ counter.increment(); // OK
 
 ### Adding side effects
 
+### Handling async data
+
 ### Multiple inheritance
 
-### Handle async action dispatching
+### Handling async action dispatching
 
 ### Initializing and disposing events
 
@@ -215,3 +217,5 @@ counter.increment(); // OK
 ### refresh
 
 ### stale
+
+### useStable
