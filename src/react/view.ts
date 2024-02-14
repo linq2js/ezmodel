@@ -3,7 +3,7 @@ import {
   useEffect,
   useRef,
   useRef as refHook,
-  useLayoutEffect,
+  useLayoutEffect as layoutEffectHook,
 } from "react";
 import { trackable } from "../trackable";
 import { stable } from "./stable";
@@ -37,7 +37,20 @@ export const view = <P extends Record<string, any>>(
         local.set(() => {
           const ref = refHook<LocalData<any>>();
           if (!ref.current) {
-            ref.current = { value: undefined, run: useLayoutEffect };
+            let dispose: VoidFunction | undefined;
+            ref.current = {
+              value: undefined,
+              run: (effect, deps) => {
+                layoutEffectHook(() => {
+                  const result = effect();
+                  if (typeof result === "function") {
+                    dispose = result;
+                  }
+                  return dispose;
+                }, deps);
+                return () => dispose?.();
+              },
+            };
             allLocalData.add(ref.current);
           }
           return ref.current;

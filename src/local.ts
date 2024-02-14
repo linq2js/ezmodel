@@ -4,7 +4,7 @@ export type LocalData<T> = {
   type?: string;
   value: T;
   dispose?: VoidFunction;
-  run?: (effect: () => VoidFunction | void, deps: any[]) => void;
+  run?: (effect: () => VoidFunction | void, deps: any[]) => VoidFunction;
 };
 
 export const local = scope(() => {

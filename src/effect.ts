@@ -32,11 +32,9 @@ export const effect: EffectFn = (fn: Effect, extra?: any) => {
     const deps = Array.isArray(extra) ? extra : [];
     // custom effect runner
     if (localEffect.run) {
-      localEffect.run(() => {
+      return localEffect.run(() => {
         return createEffect(fn);
       }, deps);
-
-      return () => localEffect.dispose?.();
     }
 
     // run effect immediately
