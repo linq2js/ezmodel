@@ -210,11 +210,6 @@ const createStateProp = <T>(
   };
 
   const set = (value: T) => {
-    if (customSet) {
-      customSet?.(value);
-      return;
-    }
-
     if (prev && "value" in prev && prev.value === value) {
       return;
     }
@@ -249,7 +244,10 @@ const createStateProp = <T>(
     }
 
     prev = { value };
+
     onChange.emit();
+
+    customSet?.(value);
   };
 
   const propInfo: StatePropInfo = {
