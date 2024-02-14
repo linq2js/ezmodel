@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { mkdirSync, existsSync, writeFileSync } from "fs";
 
 import typescript from "@rollup/plugin-typescript";
 import path from "path";
@@ -8,12 +9,30 @@ import packageJson from "./package.json";
 // creating entries from exports section of package.json
 const entries = {};
 
-Object.keys(packageJson.exports).forEach((key) => {
+Object.entries(packageJson.exports).forEach(([key, settings]) => {
+  if (key !== ".") {
+    // remove ./
+    const entryName = key.replace(/^\.\//, "");
+    const dir = path.resolve(__dirname, entryName);
+    if (!existsSync(dir)) {
+      mkdirSync(dir);
+    }
+    writeFileSync(
+      path.resolve(dir, "package.json"),
+      JSON.stringify({
+        main: "." + settings.import,
+        typings: "." + settings.typings,
+      }),
+      "utf-8"
+    );
+  }
+
   // main export
   if (key === ".") {
     entries["index"] = "src/index.ts";
     return;
   }
+
   // other export
   if (key.startsWith("./")) {
     const name = key.substring(2);
