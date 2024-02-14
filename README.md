@@ -62,41 +62,80 @@ character.jump(); // jumping
 
 ### Creating reactive view
 
-#### Conditional rendering
-
-Unlike other state management libraries, `ezmodel` simplifies working with conditional operations, conditional rendering, and IF conditions, removing the requirement to connect to all related stores before evaluating their values.
+The `ezmodel` `view` is a higher-order component that takes a render function as an argument and returns a component wrapper. The render function is executed during the rendering process of the component wrapper. Every access to any model property is tracked, and the component wrapper will re-render whenever any of those model properties change.
 
 ```js
-// other lib
-const ProducePrice = () => {
-  const price = useAtom(priceAtom);
-  const applyDiscount = useAtom(applyDiscountAtom);
-  const discount = useAtom(discountAtom);
-
-  return <div>Price: {applyDiscount ? price * discount : price}</div>;
-};
-
-// with ezmodel
-const applyDiscount = model({ value: true });
-const price = model({ value: 1000 });
-const discount = model({ value: 0.8 });
-
-const ProducePrice = view(() => {
-  return (
-    <div>
-      Price: {applyDiscount.value ? price.value * discount.value : price.value}
-    </div>
-  );
+const CharacterInfo = view(() => {
+  // read name from character
+  return <div>{character.name}</div>;
 });
+
+// changing character age does not trigger reactive effect
+character.age = 40;
+// the CharacterInfo will re-render when character name has been changed only
+character.name = "Ging Freecss";
 ```
 
-#### Highly rendering optimization
+With this approach, `ezmodel` helps to reduce code complexity by eliminating the need for excessive use of hooks (like useStore, useSelector, useModel, useAtom) commonly required by other libraries.
+
+We also don't need to use hooks to obtain actions/dispatchers as in `Redux`. Everything is declared within the model, and executing a model method is as straightforward as calling a normal function.
+
+```js
+const Jump = () => {
+  return <button onClick={character.jump}>Jump</button>;
+};
+```
+
+### Model is vanilla JS
 
 ### Creating local models
 
-## Using model shape factory
+## Using model props factory
 
 ## Advanced Usages
+
+### Computed/derived model props
+
+Computed model properties are a feature that allows us to declare a property whose value is derived from the values of other properties within the same model or from other models. To declare a computed property, we use the object getter syntax.
+
+```js
+const counter = model({
+  count: 1,
+  // the doubledCount property consumes count property. When the count property changed, the doubledCount property will re-compute as well
+  get doubledCount() {
+    return this.count * 2;
+  },
+});
+
+const a = model({ value: 1 });
+const b = model({ value: 2 });
+const sum = model({
+  // the computed property can also consume properties from other models
+  get value() {
+    return a.value + b.value;
+  },
+});
+```
+
+Computed properties can include complex calculations that are only executed when the computed property is accessed. Additionally, computed properties memoize the results for subsequent accesses, preventing the calculation function from being called again.
+
+```js
+const my = model({
+  otherValue: 1,
+  get doHeavyComputation() {
+    return something;
+  },
+});
+
+// at this time, doHeavyComputation is not executed yet
+console.log(my.otherValue);
+// the doHeavyComputation is called until there is access to
+console.log(my.doHeavyComputation);
+// and the result is cached for next access
+console.log(my.doHeavyComputation);
+console.log(my.doHeavyComputation);
+console.log(my.doHeavyComputation);
+```
 
 ### Strict mode
 
@@ -106,8 +145,6 @@ const ProducePrice = view(() => {
 
 ### Handle async action dispatching
 
-### Computed/derived properties
-
 ### Initializing and disposing events
 
 ### Listening action dispatches
@@ -115,6 +152,10 @@ const ProducePrice = view(() => {
 ### Fine-grained reactivity
 
 ### Tagging models
+
+### Staling model props
+
+### Refreshing model props
 
 ## API References
 
@@ -129,3 +170,7 @@ const ProducePrice = view(() => {
 ### tag
 
 ### view
+
+### refresh
+
+### stale
