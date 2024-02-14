@@ -1,4 +1,10 @@
-import { ReactElement, useEffect, useRef, useRef as refHook } from "react";
+import {
+  ReactElement,
+  useEffect,
+  useRef,
+  useRef as refHook,
+  useLayoutEffect,
+} from "react";
 import { trackable } from "../trackable";
 import { stable } from "./stable";
 import { useRerender } from "./useRerender";
@@ -31,7 +37,7 @@ export const view = <P extends Record<string, any>>(
         local.set(() => {
           const ref = refHook<LocalData<any>>();
           if (!ref.current) {
-            ref.current = { value: undefined };
+            ref.current = { value: undefined, run: useLayoutEffect };
             allLocalData.add(ref.current);
           }
           return ref.current;

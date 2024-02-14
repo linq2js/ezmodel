@@ -30,7 +30,17 @@ export const effect: EffectFn = (fn: Effect, extra?: any) => {
 
   if (localEffect) {
     const deps = Array.isArray(extra) ? extra : [];
-    // there is prev effect
+    // custom effect runner
+    if (localEffect.run) {
+      localEffect.run(() => {
+        return createEffect(fn);
+      }, deps);
+
+      return () => localEffect.dispose?.();
+    }
+
+    // run effect immediately
+    // existing effect
     if (localEffect.dispose) {
       // deps changed
       if (shallow(localEffect.value, deps)) {

@@ -115,8 +115,8 @@ describe("view", () => {
       ["count:1"],
       ["count:2"],
       ["count:3"],
-      ["dispose model"],
       ["dispose effect"],
+      ["dispose model"],
     ]);
   });
 });
