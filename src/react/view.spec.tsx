@@ -112,6 +112,9 @@ describe("view", () => {
 
     // changing version will re-ren effect
     fireEvent.click(getByText("version"));
+    fireEvent.click(getByText("version"));
+
+    fireEvent.click($button);
 
     unmount();
 
@@ -122,6 +125,9 @@ describe("view", () => {
       ["count:3"],
       ["dispose effect"],
       ["count:3"],
+      ["dispose effect"],
+      ["count:3"],
+      ["count:4"],
       ["dispose effect"],
       ["dispose model"],
     ]);
