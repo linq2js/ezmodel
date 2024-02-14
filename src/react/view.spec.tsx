@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { delay, wait } from "../async";
 import { effect } from "../effect";
 import { model } from "../model";
@@ -65,6 +65,7 @@ describe("view", () => {
   test("local model and effect", () => {
     const log = jest.fn();
     const Comp = view((props: { name: string }) => {
+      const [version, setVersion] = useState(0);
       const counter = model(() => ({
         count: 0,
         init() {
@@ -81,13 +82,14 @@ describe("view", () => {
         return () => {
           log("dispose effect");
         };
-      });
+      }, [version]);
 
       props.name;
 
       return (
         <>
           <button onClick={counter.increment}>increment</button>
+          <button onClick={() => setVersion(version + 1)}>version</button>
           <div>{counter.count}</div>
         </>
       );
@@ -108,12 +110,17 @@ describe("view", () => {
     fireEvent.click($button);
     getByText("3");
 
+    // changing version will re-ren effect
+    fireEvent.click(getByText("version"));
+
     unmount();
 
     expect(log.mock.calls).toEqual([
       ["count:0"],
       ["count:1"],
       ["count:2"],
+      ["count:3"],
+      ["dispose effect"],
       ["count:3"],
       ["dispose effect"],
       ["dispose model"],
