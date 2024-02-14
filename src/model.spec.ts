@@ -1,3 +1,4 @@
+import { filter } from "./emitter";
 import { dispose, refresh, stale, model, from, on } from "./model";
 
 describe("basic usages", () => {
@@ -213,12 +214,28 @@ describe("life cycle", () => {
     const values = [1, 2];
     const my = model({
       get data() {
-        on(events.changed);
+        refresh(events.changed);
         return values.shift();
       },
     });
     expect(my.data).toBe(1);
     events.changed();
+    expect(my.data).toBe(2);
+  });
+
+  test("conditional refresh", () => {
+    const events = model({ changed(_value: boolean) {} });
+    const values = [1, 2];
+    const my = model({
+      get data() {
+        refresh(filter(events.changed, ([value]) => value));
+        return values.shift();
+      },
+    });
+    expect(my.data).toBe(1);
+    events.changed(false);
+    expect(my.data).toBe(1);
+    events.changed(true);
     expect(my.data).toBe(2);
   });
 

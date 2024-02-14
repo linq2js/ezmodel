@@ -700,6 +700,8 @@ export type StaleFn = {
 };
 
 export type RefreshFn = {
+  (when: Listenable | Listenable<any>[]): void;
+
   <T extends StateBase>(model: T, prop?: keyof NonFunctionProps<T>): void;
   <T extends StateBase>(model: T, props?: (keyof NonFunctionProps<T>)[]): void;
   <T extends StateBase>(models: T[]): void;
@@ -719,10 +721,18 @@ export const stale: StaleFn = (input, ...args: any[]) => {
   });
 };
 
-export const refresh: RefreshFn = (input, ...args: any[]) => {
-  const models = Array.isArray(input) ? input : [input];
-  models.forEach((model) => {
-    getModelApi(model)?.refresh(...args);
+export const refresh: RefreshFn = (input: any, ...args: any[]) => {
+  const items = Array.isArray(input) ? input : [input];
+  const track = trackable()?.add;
+  items.forEach((item) => {
+    // model
+    if (isModel(item)) {
+      getModelApi(item)?.refresh(...args);
+    } else {
+      // listenable
+      const listenable = item as Listenable;
+      track?.(listenable);
+    }
   });
 };
 
@@ -730,29 +740,12 @@ export type OnFn = {
   (listenables: Listenable<any>[], listener: Listener<any>): VoidFunction;
 
   <T>(listenable: Listenable<T>, listener: Listener<T>): VoidFunction;
-
-  (listenables: Listenable<any>[]): void;
-
-  <T>(listenable: Listenable<T>): void;
 };
 
 export const on: OnFn = (
   listenables: Listenable | Listenable[],
-  listener?: Listener
+  listener: Listener
 ): any => {
-  if (!listener) {
-    const track = trackable()?.add;
-    if (track) {
-      (Array.isArray(listenables) ? listenables : [listenables]).forEach(
-        (listenable) => {
-          track(listenable);
-        }
-      );
-    }
-
-    return;
-  }
-
   const cleanup = emitter();
   (Array.isArray(listenables) ? listenables : [listenables]).forEach(
     (listenable) => {

@@ -1,4 +1,4 @@
-import { Listenable, Equal, OnceOptions, AnyFunc } from "./types";
+import { Listenable, Equal, OnceOptions, AnyFunc, NoInfer } from "./types";
 import { NOOP } from "./utils";
 
 export type Emitter<T> = Listenable<T> & {
@@ -101,4 +101,17 @@ export const emitter: EmitterFn = ({
   };
 
   return e;
+};
+
+export const filter = <T>(
+  listenable: Listenable<T>,
+  filterFn: (payload: NoInfer<T>) => boolean
+): Listenable<T> => {
+  return {
+    on(listener) {
+      return listenable.on((payload) => {
+        if (filterFn(payload)) listener(payload);
+      });
+    },
+  };
 };
