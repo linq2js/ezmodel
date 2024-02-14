@@ -1,5 +1,5 @@
 import { filter } from "./emitter";
-import { dispose, refresh, stale, model, from, on } from "./model";
+import { dispose, refresh, stale, model, from } from "./model";
 
 describe("basic usages", () => {
   test("getting value", () => {
