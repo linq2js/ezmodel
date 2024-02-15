@@ -131,7 +131,7 @@ describe("basic usages", () => {
         return "animal";
       },
     };
-    const wingedAnimal = model(animal, () => ({
+    const wingedAnimal = model([animal], () => ({
       init() {
         log("wingedAnimal.init");
         return () => log("wingedAnimal.dispose");

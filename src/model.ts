@@ -472,7 +472,7 @@ export type ModelFn = {
 
     <const TBase, TInit>(
       base: TBase,
-      initFn: (base: Base<TBase>) => TInit,
+      init: (base: NoInfer<Base<TBase>>) => TInit,
       options?: NoInfer<ModelOptions<State<Inherit<Base<TBase>, TInit>>>>
     ): ReadonlyModel<State<Inherit<Base<TBase>, TInit>>>;
   };

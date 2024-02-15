@@ -20,6 +20,21 @@ const App = view(() => (
 
 This ensures automatic updates to your views when necessary. The way you organize or modify your models is irrelevant; any syntactically valid code is effective.
 
+### Compare to Jotai
+
+```js
+import { atom } from "jotai";
+
+const countAtom = atom(0);
+
+const App = () => {
+  const [count, setCount] = useAtom(countAtom);
+  return (
+    <button onClick={() => setCount((prev) => prev + 1)}>{app.count}</button>
+  );
+};
+```
+
 ### Compare to Zustand
 
 ```js
