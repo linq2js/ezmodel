@@ -426,17 +426,20 @@ const createActionProp = <T, A extends any[]>(
 };
 
 const createModelProxy = <T extends StateBase>(
-  state: T,
+  target: T,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
 ) => {
-  return new Proxy(state, {
+  return new Proxy(target, {
     get(_, prop) {
       return getProp(prop).get();
     },
     set(_, p, value) {
       if (!setProp) return false;
       return setProp(p, value);
+    },
+    deleteProperty() {
+      return false;
     },
     /**
      * this trick to prevent immer tries to make a copy of nested models
@@ -450,7 +453,7 @@ const createModelProxy = <T extends StateBase>(
      * @returns
      */
     getPrototypeOf() {
-      return state;
+      return target;
     },
   });
 };
@@ -500,16 +503,17 @@ const createModel = <TInit>(
 ): Model<State<TInit>> => {
   const creator = typeof init === "function" ? (init as AnyFunc) : () => init;
 
-  let writableProxy: any;
+  // a proxy with full permissions (read/write/access private properties)
+  let privateProxy: any;
   const propInfoMap = new Map<string, PropInfo>();
   const onDispose = emitter();
-  const [{ dispose: factoryDispose }, shape] = disposable(creator);
+  const [{ dispose: factoryDispose }, target] = disposable(creator);
   onDispose.on(factoryDispose);
 
   const customInit: AnyFunc =
-    typeof shape.init === "function" ? shape.init : NOOP;
+    typeof target.init === "function" ? target.init : NOOP;
 
-  const descriptors = Object.getOwnPropertyDescriptors(shape);
+  const descriptors = Object.getOwnPropertyDescriptors(target);
 
   const stale = (...args: any[]) => {
     let notify = false;
@@ -584,7 +588,7 @@ const createModel = <TInit>(
   const getProp: PropGetter = (prop) => {
     if (prop === MODEL_API_PROP) return apiProp;
     if (typeof prop !== "string") return undefinedProp;
-    if (!(prop in shape)) return undefinedProp;
+    if (!(prop in target)) return undefinedProp;
 
     let propInfo = propInfoMap.get(prop);
 
@@ -598,11 +602,11 @@ const createModel = <TInit>(
             prop,
             get,
             true,
-            shape,
+            target,
             getProp,
             rules?.[prop],
             (value) => {
-              set.call(writableProxy, value);
+              set.call(privateProxy, value);
             }
           );
         } else {
@@ -610,7 +614,7 @@ const createModel = <TInit>(
             prop,
             get,
             true,
-            shape,
+            target,
             getProp,
             rules?.[prop]
           );
@@ -618,14 +622,14 @@ const createModel = <TInit>(
       } else {
         // action
         if (typeof value === "function") {
-          propInfo = createActionProp(value, writableProxy);
+          propInfo = createActionProp(value, privateProxy);
         } else {
           const getState = () => value;
           propInfo = createStateProp(
             prop,
             getState,
             false,
-            shape,
+            target,
             getProp,
             rules?.[prop]
           );
@@ -655,16 +659,16 @@ const createModel = <TInit>(
     return getProp(prop);
   };
 
-  writableProxy = createModelProxy(shape, getProp, setProp);
+  privateProxy = createModelProxy(target, getProp, setProp);
 
   const [{ dispose: initDispose }] = disposable(() => {
     tags?.forEach((tag) => {
-      const tagDispose = tag.init(writableProxy);
+      const tagDispose = tag.init(privateProxy);
       if (typeof tagDispose === "function") {
         onDispose.on(tagDispose);
       }
     });
-    const customDispose = customInit.call(writableProxy);
+    const customDispose = customInit.call(privateProxy);
     if (typeof customDispose === "function") {
       onDispose.on(customDispose);
     }
@@ -675,8 +679,9 @@ const createModel = <TInit>(
   disposable()?.add(dispose);
 
   return strict
-    ? createModelProxy(shape, getPublicProp)
-    : createModelProxy(shape, getPublicProp, setProp);
+    ? // strict proxy has no setters
+      createModelProxy(target, getPublicProp)
+    : createModelProxy(target, getPublicProp, setProp);
 };
 
 export type DisposeFn = {

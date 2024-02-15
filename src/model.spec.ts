@@ -10,6 +10,27 @@ describe("basic usages", () => {
     expect(counter.count).toBe(1);
   });
 
+  test("keys", () => {
+    const app = model({ a: 1, b: 2, c: 3 });
+    expect(Object.keys(app)).toEqual(["a", "b", "c"]);
+  });
+
+  test("entries", () => {
+    const app = model({ a: 1, b: 2, c: 3 });
+    expect(Object.entries(app)).toEqual([
+      ["a", 1],
+      ["b", 2],
+      ["c", 3],
+    ]);
+  });
+
+  test("should not allow to delete model prop", () => {
+    const app = model({ a: 1, b: 2, c: 3 }) as any;
+    expect(() => {
+      delete app.a;
+    }).toThrow();
+  });
+
   test("validate", () => {
     const counter = model(
       { count: 1 },
