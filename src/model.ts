@@ -15,9 +15,16 @@ import {
 } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
+export type Rule<T> =
+  | ((value: T) => void | boolean)
+  // sugar syntactic for zod
+  | { parse(value: T): void }
+  // sugar syntactic for other validation lib (ex: yup)
+  | { validate(value: T): void };
+
 export type ModelOptions<T> = {
   tags?: ModelTag<T>[];
-  rules?: { [key in keyof T]?: (value: Awaited<T[key]>) => void | boolean };
+  rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
 };
 
 export type StateBase = Record<string, any>;
@@ -96,20 +103,23 @@ type PropSetter = (prop: string | symbol, value: any) => boolean;
 
 const MODEL_API_PROP = Symbol("modelApi");
 
+type Validator = (value: any, transform?: (value: any) => void) => void;
+
 type ModelApi = {
   dispose: AnyFunc;
   stale: AnyFunc;
   refresh: AnyFunc;
   descriptors: Record<string, PropertyDescriptor>;
+  rules: Record<string, Validator | undefined>;
 };
 
 const createStateProp = <T>(
-  name: string,
+  _name: string,
   getState: () => T,
   computed: boolean,
   shape: any,
   getProp: PropGetter,
-  validate?: AnyFunc,
+  validate?: Validator,
   customSet?: (value: T) => void
 ): StatePropInfo => {
   let prev: { value: T } | { error: any } | undefined;
@@ -194,13 +204,6 @@ const createStateProp = <T>(
     }
   };
 
-  const validateWrapper = validate
-    ? (value: any) => {
-        const result = validate(value);
-        if (result === false) throw new Error(`Invalid ${name}`);
-      }
-    : undefined;
-
   const get = () => {
     ensureValueReady();
     if (prev && "error" in prev) {
@@ -214,13 +217,19 @@ const createStateProp = <T>(
       return;
     }
 
+    let transformed = false;
+    const transform = (newValue: any) => {
+      value = newValue;
+      transformed = true;
+    };
+
     if (isPromiseLike(value)) {
       const ar = async(value);
-      if (validateWrapper) {
+      if (validate) {
         if (ar.loading) {
           value = async(
             ar.then((resolved) => {
-              validateWrapper(resolved);
+              validate(resolved, transform);
               return resolved;
             })
           ) as T;
@@ -230,7 +239,7 @@ const createStateProp = <T>(
         } else {
           // validate resolved value
           try {
-            validateWrapper?.(ar.data);
+            validate(ar.data, transform);
             value = ar as T;
           } catch (ex) {
             value = async.reject(ex) as T;
@@ -239,8 +248,15 @@ const createStateProp = <T>(
       } else {
         value = ar as T;
       }
-    } else {
-      validateWrapper?.(value);
+    } else if (validate) {
+      validate(value, transform);
+    }
+
+    // verify data duplication again
+    if (transformed) {
+      if (prev && "value" in prev && prev.value === value) {
+        return;
+      }
     }
 
     prev = { value };
@@ -574,16 +590,48 @@ const createModel = <TInit>(
     });
   };
   const undefinedProp: UnknownPropInfo = { type: "unknown", get: NOOP };
-  const api = {
+  const api: ModelApi = {
     refresh,
     stale,
     dispose,
     descriptors,
+    rules: {},
   };
   const apiProp: UnknownPropInfo = {
     type: "unknown",
     get: () => api,
   };
+
+  if (rules) {
+    Object.entries(rules).forEach(([key, rule]) => {
+      if (!rule) return;
+
+      let validate: (...args: Parameters<Validator>) => boolean | void;
+
+      if (typeof rule === "function") {
+        validate = rule;
+      } else if ("parse" in rule) {
+        validate = (value, transform) => {
+          const newValue = rule.parse(value);
+          if (value !== newValue) {
+            transform?.(newValue);
+          }
+        };
+      } else if ("validate" in rule) {
+        validate = (value) => {
+          rule.validate(value);
+        };
+      } else {
+        // not support rule
+        return;
+      }
+
+      api.rules[key] = (value, transform) => {
+        const result = validate(value, transform);
+        if (result === false) throw new Error(`Invalid value of ${key}`);
+      };
+    });
+  }
 
   const getProp: PropGetter = (prop) => {
     if (prop === MODEL_API_PROP) return apiProp;
@@ -597,28 +645,15 @@ const createModel = <TInit>(
       // computed
       if (get) {
         // has custom setter
-        if (set) {
-          propInfo = createStateProp(
-            prop,
-            get,
-            true,
-            target,
-            getProp,
-            rules?.[prop],
-            (value) => {
-              set.call(privateProxy, value);
-            }
-          );
-        } else {
-          propInfo = createStateProp(
-            prop,
-            get,
-            true,
-            target,
-            getProp,
-            rules?.[prop]
-          );
-        }
+        propInfo = createStateProp(
+          prop,
+          get,
+          true,
+          target,
+          getProp,
+          api.rules[prop],
+          set?.bind(privateProxy)
+        );
       } else {
         // action
         if (typeof value === "function") {
@@ -631,7 +666,7 @@ const createModel = <TInit>(
             false,
             target,
             getProp,
-            rules?.[prop]
+            api.rules[prop]
           );
         }
       }

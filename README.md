@@ -86,8 +86,6 @@ const Jump = () => {
 };
 ```
 
-### Model is vanilla JS
-
 ### Creating local models
 
 ## Using model props factory
@@ -244,7 +242,7 @@ const App = () => {
 };
 ```
 
-We can also manually handle statuses (loading/error) of asynchronous data.
+We can also manually handle statuses (`loading`, `error`) of asynchronous data.
 
 ```jsx
 const TodoList = view(() => {
@@ -286,6 +284,25 @@ const TodoList = view(() => {
 ### Fine-grained reactivity
 
 ### Tagging models
+
+### Model is just vanilla JS
+
+The model is purely vanilla JavaScript and can operate universally, including on the server side. This allows for seamless sharing of logic between server and client sides.
+
+```ts
+import { model } from "ezmodel";
+import { z } from "zod";
+
+/**
+ * this logic can be shared between client and server
+ */
+const createTodo = (props: { id: number; title: string }) => {
+  return model(props, {
+    // define validation rules for id and title
+    rules: { id: z.number(), title: z.string() },
+  });
+};
+```
 
 ## API References
 

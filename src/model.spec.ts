@@ -2,6 +2,7 @@ import { alter } from "./alter";
 import { filter } from "./emitter";
 import { from } from "./from";
 import { dispose, refresh, stale, model } from "./model";
+import { z } from "zod";
 
 describe("basic usages", () => {
   test("getting value", () => {
@@ -31,12 +32,30 @@ describe("basic usages", () => {
     }).toThrow();
   });
 
-  test("validate", () => {
+  test("validate with manual validation function", () => {
     const counter = model(
       { count: 1 },
       { rules: { count: (value) => value > 0 } }
     );
-    expect(() => (counter.count = 0)).toThrow("Invalid count");
+    expect(() => (counter.count = 0)).toThrow("Invalid value of count");
+  });
+
+  test("validate with zod without transform", () => {
+    const counter = model(
+      { count: 1 },
+      { rules: { count: z.number().min(1) } }
+    );
+    expect(() => (counter.count = 0)).toThrow();
+  });
+
+  test("validate with zod with transform", () => {
+    const counter = model(
+      { count: 1 },
+      { rules: { count: z.coerce.number().min(1) } }
+    );
+    // zod will convert string to number and do validation
+    (counter as any).count = "2";
+    expect(counter.count).toBe(2);
   });
 
   test("mutate property", () => {
