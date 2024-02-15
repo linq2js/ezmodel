@@ -428,8 +428,6 @@ const createTodo = (props: { id: number; title: string }) => {
 
 ### model.strict
 
-### from
-
 ### effect
 
 ### tag
