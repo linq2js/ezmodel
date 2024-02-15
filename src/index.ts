@@ -1,5 +1,4 @@
 export * from "./model";
-export * from "./from";
 export * from "./effect";
 export * from "./async";
 export * from "./alter";

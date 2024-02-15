@@ -271,11 +271,90 @@ const TodoList = view(() => {
 
 > Note: All Promise objects stored within a model property or returned as a result of a model method are converted into an `AsyncResult` object. `AsyncResult` is a wrapper for promise objects, pre-equipped with the following properties: `loading`, `data`, and `error`. This makes controlling the state of a Promise more straightforward. When the properties of `AsyncResult` are accessed within view(), the view will track changes to the `AsyncResult` and re-render accordingly.
 
-### Multiple inheritance and props builder
+### Inheritance and props builder
+
+In practice, using inheritance techniques helps make the code clearer and simpler. `ezmodel` provides basic support for inheritance.
+
+```js
+import { model } from "ezmodel";
+
+const shape = model({ color: "white" });
+const polygon = model(
+  // base props
+  shape,
+  // polygon props
+  () => ({
+    sides: 0,
+    display() {
+      console.log(
+        `A polygon with ${this.sides} sides and color ${this.color}.`
+      );
+    },
+  })
+);
+const triangle = model(
+  polygon,
+  // triangle props
+  () => ({
+    // override props of polygon
+    color: "red",
+    sides: 3,
+  })
+);
+
+triangle.display(); // A polygon with 3 sides and color red.
+```
+
+We can also create models with properties inherited from multiple other models.
+
+```js
+const canEat = model({
+  eat() {
+    console.log("eating");
+  },
+});
+
+const canRun = model({
+  run() {
+    console.log("running");
+  },
+});
+
+const person = model(
+  // base models
+  [canEat, canRun],
+  () => ({
+    name: "Ging",
+  })
+);
+
+person.eat(); // eating
+person.run(); // running
+person.name; // Ging
+```
+
+#### Why shouldn't we use object spread operator?
+
+When you use the object spread operator, all properties with custom getters must be evaluated before copying, which can be inefficient and may lead to unintended side effects. In contrast, `ezmodel` uses `Object.getOwnPropertyDescriptors` to read all properties of one or more objects while skipping the execution of object getters.
+
+```js
+const machine = model({
+  get heavyComputation() {},
+});
+
+const human = model({
+  get fetchingLogic() {},
+});
+
+const cyborg = model({
+  ...machine, //heavyComputation invoked
+  ...human, // fetchingLogic invoked
+});
+```
 
 ### Handling async action dispatching
 
-### Initializing and disposing events
+### Model lifecycle
 
 ### Listening action dispatches
 

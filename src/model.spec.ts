@@ -1,6 +1,5 @@
 import { alter } from "./alter";
 import { filter } from "./emitter";
-import { from } from "./from";
 import { dispose, refresh, stale, model } from "./model";
 import { z } from "zod";
 
@@ -96,18 +95,6 @@ describe("basic usages", () => {
     expect(counter.count).toBe(2);
   });
 
-  test("build props from getter", () => {
-    const app = model(from(["aa", "bb"], (prop) => prop.toUpperCase()));
-    expect(app.aa).toBe("AA");
-    expect(app.bb).toBe("BB");
-  });
-
-  test("build props from getter map", () => {
-    const app = model(from({ aa: () => 1, bb: () => 2 }));
-    expect(app.aa).toBe(1);
-    expect(app.bb).toBe(2);
-  });
-
   test("custom setter", () => {
     const app = model({
       todos: [{ done: true }, { done: false }],
@@ -134,38 +121,64 @@ describe("basic usages", () => {
     const log = jest.fn();
     // animal is plain object
     const animal = {
-      name: "",
+      init() {
+        log("animal.init");
+        return () => log("animal.dispose");
+      },
+      name: "animal",
       get class() {
         log("animal");
         return "animal";
       },
     };
-    const wingedAnimal = model(
-      from(animal, {
-        // override name prop of animal
-        name: false,
-        get class() {
-          log("wingedAnimal");
-          return "wingedAnimal";
-        },
-        get wings() {
-          return true;
-        },
-      })
-    );
-    const bat = model(
-      from(animal, wingedAnimal, {
-        // override name prop of both animal and wingedAnimal
-        get name() {
-          return "bat";
-        },
-      })
-    );
+    const wingedAnimal = model(animal, () => ({
+      init() {
+        log("wingedAnimal.init");
+        return () => log("wingedAnimal.dispose");
+      },
+      // override name prop of animal
+      name: false,
+      get class() {
+        log("wingedAnimal");
+        return "wingedAnimal";
+      },
+      get wings() {
+        return true;
+      },
+    }));
+    const bat = model([animal, wingedAnimal], (base) => ({
+      init() {
+        log("parent:" + base.class);
+        log("bat.init");
+        return () => log("bat.dispose");
+      },
+      // override name prop of both animal and wingedAnimal
+      get name() {
+        return "bat";
+      },
+    }));
 
     expect(bat.name).toBe("bat");
     expect(bat.class).toBe("wingedAnimal");
+    expect(Object.keys(bat)).toEqual(["init", "name", "class", "wings"]);
     // should not call class property of animal
-    expect(log.mock.calls).toEqual([["wingedAnimal"]]);
+    dispose(bat);
+    expect(log.mock.calls).toEqual([
+      // create wingedAnimal
+      ["animal.init"],
+      ["wingedAnimal.init"],
+      // create bat
+      ["animal.init"],
+      ["wingedAnimal.init"],
+      // wingedAnimal.class call
+      ["wingedAnimal"],
+      // bat init
+      ["parent:wingedAnimal"],
+      ["bat.init"],
+      ["animal.dispose"],
+      ["wingedAnimal.dispose"],
+      ["bat.dispose"],
+    ]);
   });
 
   test("computed prop", () => {

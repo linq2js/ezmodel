@@ -15,6 +15,24 @@ import {
 } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
+export type Override<B, D> = {
+  [key in keyof B | keyof D]: key extends keyof D
+    ? D[key]
+    : key extends keyof B
+    ? B[key]
+    : never;
+};
+
+export type Base<T> = T extends readonly [infer F, ...infer R]
+  ? R extends readonly [] // end of array
+    ? F
+    : R extends readonly [infer L] // last item
+    ? Override<F, L>
+    : Override<F, Base<R>>
+  : T extends Record<string, any>
+  ? T
+  : never;
+
 export type Rule<T> =
   | ((value: T) => void | boolean)
   // sugar syntactic for zod
@@ -124,11 +142,13 @@ type ModelApi = {
   dispose: AnyFunc;
   stale: AnyFunc;
   refresh: AnyFunc;
+  initFunctions: Set<AnyFunc>;
   descriptors: Record<string, PropertyDescriptor>;
   rules: Record<string, Validator | undefined>;
 };
 
 const createStateProp = <T>(
+  descriptors: Record<string, PropertyDescriptor>,
   _name: string,
   getState: () => T,
   computed: boolean,
@@ -167,6 +187,7 @@ const createStateProp = <T>(
       if (!thisObject) {
         thisObject = createModelProxy(
           shape,
+          descriptors,
           // custom get prop
           (prop) => {
             const info = getProp(prop);
@@ -464,6 +485,7 @@ const createActionProp = <T, A extends any[]>(
 
 const createModelProxy = <T extends StateBase>(
   target: T,
+  descriptors: Record<string, PropertyDescriptor>,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
 ) => {
@@ -477,6 +499,15 @@ const createModelProxy = <T extends StateBase>(
     },
     deleteProperty() {
       return false;
+    },
+    ownKeys(_) {
+      return Object.keys(descriptors);
+    },
+    getOwnPropertyDescriptor(_, p) {
+      if (typeof p !== "string") {
+        return undefined;
+      }
+      return descriptors[p];
     },
     /**
      * this trick to prevent immer tries to make a copy of nested models
@@ -495,23 +526,88 @@ const createModelProxy = <T extends StateBase>(
   });
 };
 
+export type ReadonlyModel<T> = Model<Readonly<T>>;
+
 export type State<T> = T extends () => infer R ? R : T;
 
+/**
+ * model(base, initFn, options)
+ * model(props, options)
+ */
+
 export type ModelFn = {
-  strict<TInit>(
-    init: TInit,
-    options?: NoInfer<ModelOptions<State<TInit>>>
-  ): Model<Readonly<State<TInit>>>;
+  strict: {
+    <TInit>(
+      init: TInit,
+      options?: NoInfer<ModelOptions<State<TInit>>>
+    ): ReadonlyModel<State<TInit>>;
+
+    <const TBase, TInit>(
+      base: TBase,
+      initFn: (base: Base<TBase>) => TInit,
+      options?: NoInfer<ModelOptions<State<Override<Base<TBase>, TInit>>>>
+    ): ReadonlyModel<State<Override<Base<TBase>, TInit>>>;
+  };
 
   <TInit>(init: TInit, options?: NoInfer<ModelOptions<State<TInit>>>): Model<
     State<TInit>
   >;
+
+  <const TBase, TInit>(
+    base: TBase,
+    initFn: (base: NoInfer<Base<TBase>>) => TInit,
+    options?: NoInfer<ModelOptions<State<Override<Base<TBase>, TInit>>>>
+  ): Model<State<Override<Base<TBase>, TInit>>>;
 };
 
-export const model: ModelFn = Object.assign(
-  (init: unknown, options?: ModelOptions<any>) => {
+export const mergeDescriptors = (
+  initFunctions: Set<AnyFunc>,
+  baseDescriptors: Record<string, PropertyDescriptor>,
+  models: any[]
+) => {
+  models.forEach((model) => {
+    const api = getModelApi(model);
+    if (api) {
+      api.initFunctions.forEach((init) => initFunctions.add(init));
+      Object.assign(baseDescriptors, api.descriptors);
+    } else {
+      if (typeof model.init === "function") {
+        initFunctions.add(model.init);
+      }
+      Object.assign(baseDescriptors, Object.getOwnPropertyDescriptors(model));
+    }
+  });
+};
+
+const createModelFactory =
+  (strict: boolean) =>
+  (...args: any[]) => {
+    const baseDescriptors: Record<string, PropertyDescriptor> = {};
+    const initFunctions = new Set<AnyFunc>();
+    let init: any;
+    let options: ModelOptions<any> | undefined;
+
+    // OVERLOAD: modal(base, initFn, options?)
+    if (typeof args[1] === "function") {
+      let base;
+      [base, init, options] = args;
+      mergeDescriptors(
+        initFunctions,
+        baseDescriptors,
+        Array.isArray(base) ? base : [base]
+      );
+    } else {
+      [init, options] = args;
+    }
+
     const localModel = local()?.get("model", () => {
-      const s = createModel(init, options);
+      const s = createModel(
+        strict,
+        initFunctions,
+        baseDescriptors,
+        init,
+        options
+      );
 
       return {
         value: s,
@@ -525,40 +621,101 @@ export const model: ModelFn = Object.assign(
       return localModel.value as any;
     }
 
-    return createModel(init, options);
-  },
-  {
-    strict(init: unknown, options?: ModelOptions<any>) {
-      return model(init, Object.assign({}, options, { strict: true }));
-    },
-  }
-);
+    return createModel(strict, initFunctions, baseDescriptors, init, options);
+  };
+
+export const model: ModelFn = Object.assign(createModelFactory(false), {
+  strict: createModelFactory(true),
+});
 
 const createModel = <TInit>(
+  strict: boolean,
+  initFunctions: Set<AnyFunc>,
+  baseDescriptors: Record<string, PropertyDescriptor> | undefined,
   init: TInit,
-  {
-    strict,
-    tags,
-    rules,
-    save,
-    load,
-  }: { strict?: boolean } & ModelOptions<any> = {}
+  { tags, rules, save, load }: ModelOptions<any> = {}
 ): Model<State<TInit>> => {
-  const creator = typeof init === "function" ? (init as AnyFunc) : () => init;
-
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
+  const creator =
+    typeof init === "function"
+      ? () => {
+          return init(privateProxy);
+        }
+      : () => init;
   let persistedValues: Record<string, any>;
+  let descriptorsReady = false;
   const propInfoMap = new Map<string, PropInfo>();
+  const descriptors: Record<string, PropertyDescriptor> = {};
   const onDispose = emitter();
+
+  const getProp: PropGetter = (prop) => {
+    if (!descriptorsReady) {
+      throw new Error(
+        "Access to model properties is not permitted during the model creation phase. It may be necessary to place this code within the `init()` function"
+      );
+    }
+    if (prop === MODEL_API_PROP) return apiProp;
+    if (typeof prop !== "string") return undefinedProp;
+    if (!(prop in descriptors)) return undefinedProp;
+
+    let propInfo = propInfoMap.get(prop);
+
+    if (!propInfo) {
+      const { get, set, value } = descriptors[prop];
+      // is action
+      if (typeof value === "function") {
+        propInfo = createActionProp(value, privateProxy);
+      } else {
+        const isComputed = !!get;
+        const getValue = get ?? (() => getPersistedValue(prop, value));
+
+        propInfo = createStateProp(
+          descriptors,
+          prop,
+          getValue,
+          isComputed,
+          target,
+          getProp,
+          api.rules[prop],
+          set?.bind(privateProxy),
+          saveWrapper
+        );
+      }
+
+      propInfoMap.set(prop, propInfo);
+    }
+
+    return propInfo;
+  };
+
+  const setProp: PropSetter = (prop, value) => {
+    const propInfo = getProp(prop);
+    if (propInfo && "type" in propInfo && propInfo.type === "state") {
+      propInfo.set(value);
+      return true;
+    }
+    return false;
+  };
+
+  privateProxy = createModelProxy({}, descriptors, getProp, setProp);
   const [{ dispose: factoryDispose }, target] = disposable(creator);
   onDispose.on(factoryDispose);
 
-  const customInit: AnyFunc =
-    typeof target.init === "function" ? target.init : NOOP;
-  const descriptors = Object.getOwnPropertyDescriptors(target);
-  const saveWrapper = save ? () => save(proxy) : undefined;
+  if (typeof target.init === "function") {
+    initFunctions.add(target.init);
+  }
+
+  Object.assign(
+    descriptors,
+    baseDescriptors,
+    Object.getOwnPropertyDescriptors(target)
+  );
+
+  descriptorsReady = true;
+
+  const saveWrapper = save ? () => save(privateProxy) : undefined;
 
   const stale = (...args: any[]) => {
     let notify = false;
@@ -634,6 +791,7 @@ const createModel = <TInit>(
     stale,
     dispose,
     descriptors,
+    initFunctions,
     rules: {},
   };
   const apiProp: UnknownPropInfo = {
@@ -672,49 +830,6 @@ const createModel = <TInit>(
     });
   }
 
-  const getProp: PropGetter = (prop) => {
-    if (prop === MODEL_API_PROP) return apiProp;
-    if (typeof prop !== "string") return undefinedProp;
-    if (!(prop in target)) return undefinedProp;
-
-    let propInfo = propInfoMap.get(prop);
-
-    if (!propInfo) {
-      const { get, set, value } = descriptors[prop];
-      // is action
-      if (typeof value === "function") {
-        propInfo = createActionProp(value, privateProxy);
-      } else {
-        const isComputed = !!get;
-        const getValue = get ?? (() => getPersistedValue(prop, value));
-
-        propInfo = createStateProp(
-          prop,
-          getValue,
-          isComputed,
-          target,
-          getProp,
-          api.rules[prop],
-          set?.bind(privateProxy),
-          saveWrapper
-        );
-      }
-
-      propInfoMap.set(prop, propInfo);
-    }
-
-    return propInfo;
-  };
-
-  const setProp: PropSetter = (prop, value) => {
-    const propInfo = getProp(prop);
-    if (propInfo && "type" in propInfo && propInfo.type === "state") {
-      propInfo.set(value);
-      return true;
-    }
-    return false;
-  };
-
   const getPublicProp = (prop: string | symbol) => {
     if (typeof prop === "string" && prop[0] === "_") {
       throw new Error("Cannot read private prop");
@@ -723,8 +838,6 @@ const createModel = <TInit>(
     return getProp(prop);
   };
 
-  privateProxy = createModelProxy(target, getProp, setProp);
-
   const [{ dispose: initDispose }] = disposable(() => {
     tags?.forEach((tag) => {
       const tagDispose = tag.init(privateProxy);
@@ -732,16 +845,19 @@ const createModel = <TInit>(
         onDispose.on(tagDispose);
       }
     });
-    const customDispose = customInit.call(privateProxy);
-    if (typeof customDispose === "function") {
-      onDispose.on(customDispose);
-    }
+
+    initFunctions.forEach((init) => {
+      const dispose = init.call(privateProxy);
+      if (typeof dispose === "function") {
+        onDispose.on(dispose);
+      }
+    });
   });
 
   proxy = strict
     ? // strict proxy has no setters
-      createModelProxy(target, getPublicProp)
-    : createModelProxy(target, getPublicProp, setProp);
+      createModelProxy(target, descriptors, getPublicProp)
+    : createModelProxy(target, descriptors, getPublicProp, setProp);
 
   onDispose.on(initDispose);
 
