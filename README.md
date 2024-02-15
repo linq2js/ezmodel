@@ -8,7 +8,6 @@
 2. Always wrap your models with `model()`.
 
 ```js
-import React from "react";
 import { model } from "ezmodel";
 import { view } from "ezmodel/react";
 
