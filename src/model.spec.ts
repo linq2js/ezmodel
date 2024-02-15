@@ -25,6 +25,12 @@ describe("basic usages", () => {
     ]);
   });
 
+  test("serialize", () => {
+    const counter = model({ count: 1 });
+    counter.count++;
+    expect(JSON.stringify(counter)).toBe('{"count":2}');
+  });
+
   test("should not allow to delete model prop", () => {
     const app = model({ a: 1, b: 2, c: 3 }) as any;
     expect(() => {
