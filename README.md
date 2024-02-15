@@ -9,7 +9,7 @@
 
 ```js
 import { model } from "ezmodel";
-import { view } from "ezmodel/react";
+import { view, model } from "ezmodel/react";
 
 const app = model({ count: 0 });
 
