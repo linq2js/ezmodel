@@ -198,13 +198,82 @@ const removeEffect = effect(() => {
 });
 
 counter.count++; // count: 2
-removeEffect(); // effect is removed
+removeEffect();
 counter.count++; // no log
 ```
 
 ### Handling async data
 
-### Multiple inheritance
+`ezmodel` provides a `wait()` function for handling asynchronous data. `wait()` takes one or more Promise objects and will return the resolved data if the Promise is fulfilled, or throw an error if the Promise is rejected, and will throw the Promise object itself if it is still pending. The nearest `Suspense` and `ErrorBoundary` wrappers will catch the outcomes of `wait()` and proceed to render the corresponding fallback.
+
+```jsx
+import { wait, model } from "ezmodel";
+import { view } from "ezmodel/react";
+import { ErrorBoundary } from "react-error-boundary";
+
+const app = model({
+  get todos() {
+    // fetch todo list
+    return fetch("https://jsonplaceholder.typicode.com/todos").then((res) =>
+      res.json()
+    );
+  },
+});
+
+const TodoList = view(() => {
+  // return array of todos, no async operator needed
+  const todos = wait(app.todos);
+
+  return (
+    <>
+      {todos.map((todo) => (
+        <TodoItem key={todo.id} todo={todo} />
+      ))}
+    </>
+  );
+});
+
+const App = () => {
+  return (
+    <ErrorBoundary fallback="Something went wrong">
+      <Suspense fallback="Loading...">
+        <TodoList />
+      </Suspense>
+    </ErrorBoundary>
+  );
+};
+```
+
+We can also manually handle statuses (loading/error) of asynchronous data.
+
+```jsx
+const TodoList = view(() => {
+  if (app.todos.loading) {
+    // custom loading indicator
+    return <div>Loading...</div>;
+  }
+
+  // custom error
+  if (app.todos.error) {
+    return <div>Something went wrong</div>;
+  }
+
+  // read data from todos prop
+  const todos = app.todos.data;
+
+  return (
+    <>
+      {todos.map((todo) => (
+        <TodoItem key={todo.id} todo={todo} />
+      ))}
+    </>
+  );
+});
+```
+
+> Note: All Promise objects stored within a model property or returned as a result of a model method are converted into an `AsyncResult` object. `AsyncResult` is a wrapper for promise objects, pre-equipped with the following properties: `loading`, `data`, and `error`. This makes controlling the state of a Promise more straightforward. When the properties of `AsyncResult` are accessed within view(), the view will track changes to the `AsyncResult` and re-render accordingly.
+
+### Multiple inheritance and props builder
 
 ### Handling async action dispatching
 
