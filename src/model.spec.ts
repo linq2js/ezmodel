@@ -43,7 +43,7 @@ describe("basic usages", () => {
       { count: 1 },
       { rules: { count: (value) => value > 0 } }
     );
-    expect(() => (counter.count = 0)).toThrow("Invalid value of count");
+    expect(() => (counter.count = 0)).toThrow("Invalid 'count' value");
   });
 
   test("validate with zod without transform", () => {
@@ -217,6 +217,42 @@ describe("basic usages", () => {
     });
     expect(counter.count).toBe(1);
     expect(() => (counter as any)._count).toThrow();
+  });
+
+  test("load model", () => {
+    const log = jest.fn();
+    const app = model(
+      { prop1: 1, prop2: 2 },
+      {
+        load() {
+          log("load");
+          return { prop1: 3 };
+        },
+      }
+    );
+
+    // load function should not called when model is created
+    expect(log).not.toHaveBeenCalled();
+    expect(app.prop2).toBe(2); // use default value for prop2 if there is no persisted data
+    // load function should be called after model has first prop access
+    expect(log).toHaveBeenCalled();
+    expect(app.prop1).toBe(3);
+  });
+
+  test("save model", () => {
+    const log = jest.fn();
+    const app = model(
+      { count1: 1, count2: 2 },
+      {
+        save(m) {
+          log(JSON.stringify(m));
+        },
+      }
+    );
+    app.count1++;
+    expect(log).toHaveBeenLastCalledWith('{"count1":2,"count2":2}');
+    app.count2++;
+    expect(log).toHaveBeenLastCalledWith('{"count1":2,"count2":3}');
   });
 });
 

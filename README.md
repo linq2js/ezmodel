@@ -281,6 +281,45 @@ const TodoList = view(() => {
 
 ### Validating model properties
 
+With `ezmodel`, we can define validation for each property of the model. Validation is executed whenever the value of a model property changes.
+
+```js
+const counter = model(
+  { count: 1 },
+  {
+    rules: {
+      // validation function for count prop
+      count(value) {
+        if (!value) throw new Error("Invalid count");
+      },
+      // ...other rules here
+    },
+  }
+);
+
+counter.count = 0; // getting `Invalid count` error
+```
+
+The validation function can also return `false` if the input value is invalid, and `ezmodel` will automatically throw an `"Invalid '{propName}' value"` error.
+
+```js
+const counter = model({ count: 1 }, { rules: { count: (value) => value > 0 } });
+
+counter.count = 0; // getting `Invalid 'count' value` error
+```
+
+`ezmodel` can also work with other validation libraries like `yup` or `zod`.
+
+```js
+const counter = model(
+  { count: 1 },
+  { rules: { count: z.coerce.number().min(1) } }
+);
+// try to assign string instead number and zod will convert the value to number and does validation
+counter.count = "2";
+expect(counter.count).toBe(2);
+```
+
 ### Fine-grained reactivity
 
 ### Tagging models

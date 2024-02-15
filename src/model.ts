@@ -24,7 +24,22 @@ export type Rule<T> =
 
 export type ModelOptions<T> = {
   tags?: ModelTag<T>[];
+
   rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
+  /**
+   * This method will be invoked to load model persisted data until the first property access of the model occurs.
+   * @returns
+   */
+  load?: () => {
+    [key in keyof T as T[key] extends AnyFunc ? never : key]?: T[key];
+  };
+
+  /**
+   * This method will be called to save model data to persistent storage whenever model properties have been changed.
+   * @param model
+   * @returns
+   */
+  save?: (model: T) => void;
 };
 
 export type StateBase = Record<string, any>;
@@ -120,7 +135,8 @@ const createStateProp = <T>(
   shape: any,
   getProp: PropGetter,
   validate?: Validator,
-  customSet?: (value: T) => void
+  customSet?: (value: T) => void,
+  save?: VoidFunction
 ): StatePropInfo => {
   let prev: { value: T } | { error: any } | undefined;
   let thisObject: any;
@@ -133,6 +149,7 @@ const createStateProp = <T>(
     prev = undefined;
     onChange.emit();
   };
+
   const addDependency = (info: StatePropInfo) => {
     if (!dependencies.has(info)) {
       dependencies.add(info);
@@ -303,6 +320,10 @@ const createStateProp = <T>(
   };
 
   Object.assign(onChange, { $state: propInfo });
+
+  if (save) {
+    onChange.on(save);
+  }
 
   return propInfo;
 };
@@ -515,12 +536,20 @@ export const model: ModelFn = Object.assign(
 
 const createModel = <TInit>(
   init: TInit,
-  { strict, tags, rules }: { strict?: boolean } & ModelOptions<any> = {}
+  {
+    strict,
+    tags,
+    rules,
+    save,
+    load,
+  }: { strict?: boolean } & ModelOptions<any> = {}
 ): Model<State<TInit>> => {
   const creator = typeof init === "function" ? (init as AnyFunc) : () => init;
 
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
+  let proxy: any;
+  let persistedValues: Record<string, any>;
   const propInfoMap = new Map<string, PropInfo>();
   const onDispose = emitter();
   const [{ dispose: factoryDispose }, target] = disposable(creator);
@@ -528,8 +557,8 @@ const createModel = <TInit>(
 
   const customInit: AnyFunc =
     typeof target.init === "function" ? target.init : NOOP;
-
   const descriptors = Object.getOwnPropertyDescriptors(target);
+  const saveWrapper = save ? () => save(proxy) : undefined;
 
   const stale = (...args: any[]) => {
     let notify = false;
@@ -564,6 +593,16 @@ const createModel = <TInit>(
       });
     }
   };
+  const getPersistedValue = (prop: string, defaultValue: any) => {
+    if (!persistedValues) {
+      persistedValues = load ? load() : {};
+    }
+    if (!(prop in persistedValues)) {
+      return defaultValue;
+    }
+    return persistedValues[prop];
+  };
+
   const refresh = (props?: string | string[]) => {
     if (props) {
       (Array.isArray(props) ? props : [props]).forEach((prop) => {
@@ -628,7 +667,7 @@ const createModel = <TInit>(
 
       api.rules[key] = (value, transform) => {
         const result = validate(value, transform);
-        if (result === false) throw new Error(`Invalid value of ${key}`);
+        if (result === false) throw new Error(`Invalid '${key}' value`);
       };
     });
   }
@@ -642,33 +681,23 @@ const createModel = <TInit>(
 
     if (!propInfo) {
       const { get, set, value } = descriptors[prop];
-      // computed
-      if (get) {
-        // has custom setter
+      // is action
+      if (typeof value === "function") {
+        propInfo = createActionProp(value, privateProxy);
+      } else {
+        const isComputed = !!get;
+        const getValue = get ?? (() => getPersistedValue(prop, value));
+
         propInfo = createStateProp(
           prop,
-          get,
-          true,
+          getValue,
+          isComputed,
           target,
           getProp,
           api.rules[prop],
-          set?.bind(privateProxy)
+          set?.bind(privateProxy),
+          saveWrapper
         );
-      } else {
-        // action
-        if (typeof value === "function") {
-          propInfo = createActionProp(value, privateProxy);
-        } else {
-          const getState = () => value;
-          propInfo = createStateProp(
-            prop,
-            getState,
-            false,
-            target,
-            getProp,
-            api.rules[prop]
-          );
-        }
       }
 
       propInfoMap.set(prop, propInfo);
@@ -709,14 +738,16 @@ const createModel = <TInit>(
     }
   });
 
+  proxy = strict
+    ? // strict proxy has no setters
+      createModelProxy(target, getPublicProp)
+    : createModelProxy(target, getPublicProp, setProp);
+
   onDispose.on(initDispose);
 
   disposable()?.add(dispose);
 
-  return strict
-    ? // strict proxy has no setters
-      createModelProxy(target, getPublicProp)
-    : createModelProxy(target, getPublicProp, setProp);
+  return proxy;
 };
 
 export type DisposeFn = {
