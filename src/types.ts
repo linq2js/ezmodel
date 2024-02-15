@@ -74,3 +74,98 @@ export interface Loader<T> {
   stale(): void;
   reload(): AsyncResult<T>;
 }
+
+export type Inherit<B, D> = {
+  [key in keyof B | keyof D]: key extends keyof D
+    ? D[key]
+    : key extends keyof B
+    ? B[key]
+    : never;
+};
+
+export type Base<T> = T extends readonly [infer TFirst, ...infer TRest]
+  ? TRest extends readonly [] // end of array
+    ? TFirst
+    : TRest extends readonly [infer TLast] // last item
+    ? Inherit<TFirst, TLast>
+    : Inherit<TFirst, Base<TRest>>
+  : T extends Record<string, any>
+  ? T
+  : never;
+
+export type Rule<T> =
+  | ((value: T) => void | boolean)
+  // sugar syntactic for zod
+  | { parse(value: T): void }
+  // sugar syntactic for other validation lib (ex: yup)
+  | { validate(value: T): void };
+
+export type StateBase = Record<string, any>;
+
+export type Tag<T = any> = {
+  readonly type: "tag";
+  readonly count: number;
+  readonly all: T[];
+  init: (model: T) => any;
+  each(callback: (model: T) => void): void;
+};
+
+export type PublicProps<T> = Omit<
+  {
+    // exclude private props
+    [key in keyof T as key extends `_${string}` ? never : key]: T[key] extends (
+      ...args: infer TArgs
+    ) => infer TResult
+      ? Action<TResult, TArgs>
+      : T[key] extends Promise<infer R>
+      ? AsyncResult<R>
+      : T[key];
+  },
+  "init"
+>;
+
+export type NonFunctionProps<T> = {
+  [key in keyof T as T[key] extends AnyFunc ? never : key]: T[key];
+};
+
+export const MODEL_TYPE = Symbol("ezmodel.model");
+
+export const NO_WRAP = Symbol("ezmodel.noWrap");
+
+export type Model<T> = T extends StateBase
+  ? PublicProps<T> & {
+      /**
+       * This is trick for Typescript checking
+       * Sometimes you need to pass model as mutable object, it is not safe if you do below
+       * ```ts
+       * // DON'T
+       * const updateTodo = (todo: Todo, newTitle: string) => {
+       *  // we cannot ensure the todo object is modal or plain object
+       *  // so changing model prop does not trigger any reactive effect
+       *  todo.title = newTitle
+       * }
+       * const todoObject = { title: 'abc' })
+       * const todoModel = model({ title: 'abc' }))
+       * updateTodo(todoObject; // No error
+       * updateTodo(todoModel; // No error
+       *
+       * // DO
+       * const updateTodo = (todo: Model<Todo>) => {
+       *  todo.title = newTitle
+       * }
+       *
+       * updateTodo(todoObject; // Typescript error: Property '[MODEL]'  is missing in type Todo
+       * updateTodo(todoModel; // No error
+       * ```
+       */
+      [MODEL_TYPE]: true;
+    }
+  : never;
+
+export type Group<K, V, R = V> = {
+  (key: K): R;
+  clear(): void;
+  readonly size: number;
+  each(callback: (value: V, key: K) => void): void;
+  delete(keyOrFilter: K | ((key: K) => boolean)): void;
+};

@@ -1,14 +1,6 @@
 import { disposable } from "./disposable";
 import { objectKeyedMap } from "./objectKeyedMap";
-import { AnyFunc, NoInfer } from "./types";
-
-export type Group<K, V, R = V> = {
-  (key: K): R;
-  clear(): void;
-  readonly size: number;
-  each(callback: (value: V, key: K) => void): void;
-  delete(keyOrFilter: K | ((key: K) => boolean)): void;
-};
+import { AnyFunc, Group, NO_WRAP, NoInfer } from "./types";
 
 export type GroupFn = {
   <TKey, TValue, TResult>(
@@ -42,6 +34,7 @@ export const group: GroupFn = <K, V, R = V>(
       return value as unknown as R;
     },
     {
+      [NO_WRAP]: true,
       size: 0,
       clear: items.clear,
       each(callback: AnyFunc) {

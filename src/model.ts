@@ -3,47 +3,29 @@ import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
 import { local } from "./local";
-import { ModelTag } from "./tag";
 import { trackable } from "./trackable";
 import {
-  Action,
   AnyFunc,
   AsyncResult,
+  Base,
+  Inherit,
   Listenable,
-  Listener,
   NoInfer,
+  Rule,
+  StateBase,
+  Tag,
+  NonFunctionProps,
+  Model,
+  MODEL_TYPE,
+  NO_WRAP,
 } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
-export type Override<B, D> = {
-  [key in keyof B | keyof D]: key extends keyof D
-    ? D[key]
-    : key extends keyof B
-    ? B[key]
-    : never;
-};
-
-export type Base<T> = T extends readonly [infer F, ...infer R]
-  ? R extends readonly [] // end of array
-    ? F
-    : R extends readonly [infer L] // last item
-    ? Override<F, L>
-    : Override<F, Base<R>>
-  : T extends Record<string, any>
-  ? T
-  : never;
-
-export type Rule<T> =
-  | ((value: T) => void | boolean)
-  // sugar syntactic for zod
-  | { parse(value: T): void }
-  // sugar syntactic for other validation lib (ex: yup)
-  | { validate(value: T): void };
-
 export type ModelOptions<T> = {
-  tags?: ModelTag<T>[];
+  tags?: Tag<T>[];
 
   rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
+
   /**
    * This method will be invoked to load model persisted data until the first property access of the model occurs.
    * @returns
@@ -60,65 +42,15 @@ export type ModelOptions<T> = {
   save?: (model: T) => void;
 };
 
-export type StateBase = Record<string, any>;
-
-export type PublicProps<T> = Omit<
-  {
-    // exclude private props
-    [key in keyof T as key extends `_${string}` ? never : key]: T[key] extends (
-      ...args: infer A
-    ) => infer R
-      ? Action<R, A>
-      : T[key] extends Promise<infer R>
-      ? AsyncResult<R>
-      : T[key];
-  },
-  "init"
->;
-
-export type NonFunctionProps<T> = {
-  [key in keyof T as T[key] extends AnyFunc ? never : key]: T[key];
-};
-
-export const MODEL = Symbol("model");
-
-export type Model<T> = T extends StateBase
-  ? PublicProps<T> & {
-      /**
-       * This is trick for Typescript checking
-       * Sometimes you need to pass model as mutable object, it is not safe if you do below
-       * ```ts
-       * // DON'T
-       * const updateTodo = (todo: Todo, newTitle: string) => {
-       *  // we cannot ensure the todo object is modal or plain object
-       *  // so changing model prop does not trigger any reactive effect
-       *  todo.title = newTitle
-       * }
-       * const todoObject = { title: 'abc' })
-       * const todoModel = model({ title: 'abc' }))
-       * updateTodo(todoObject; // No error
-       * updateTodo(todoModel; // No error
-       *
-       * // DO
-       * const updateTodo = (todo: Model<Todo>) => {
-       *  todo.title = newTitle
-       * }
-       *
-       * updateTodo(todoObject; // Typescript error: Property '[MODEL]'  is missing in type Todo
-       * updateTodo(todoModel; // No error
-       * ```
-       */
-      [MODEL]: true;
-    }
-  : never;
-
 type PropInfoBase = {
   get(): any;
 };
+
 type UpdatablePropInfo = PropInfoBase & {
   on: Listenable["on"];
   dispose: VoidFunction;
 };
+
 type StatePropInfo = UpdatablePropInfo & {
   type: "state";
   stale(notify?: boolean): void;
@@ -126,6 +58,7 @@ type StatePropInfo = UpdatablePropInfo & {
   hasError(): boolean;
   set(value: any): void;
 };
+
 type ActionPropInfo = UpdatablePropInfo & { type: "action" };
 type UnknownPropInfo = PropInfoBase & { type: "unknown" };
 
@@ -134,8 +67,6 @@ type PropInfo = StatePropInfo | ActionPropInfo | UnknownPropInfo;
 type PropGetter = (prop: string | symbol) => PropInfo;
 type PropSetter = (prop: string | symbol, value: any) => boolean;
 
-const MODEL_API_PROP = Symbol("modelApi");
-
 type Validator = (value: any, transform?: (value: any) => void) => void;
 
 type ModelApi = {
@@ -143,16 +74,14 @@ type ModelApi = {
   stale: AnyFunc;
   refresh: AnyFunc;
   initFunctions: Set<AnyFunc>;
-  descriptors: Record<string, PropertyDescriptor>;
+  descriptors: DescriptorMap;
   rules: Record<string, Validator | undefined>;
 };
 
 const createStateProp = <T>(
-  descriptors: Record<string, PropertyDescriptor>,
-  _name: string,
+  descriptors: DescriptorMap,
   getState: () => T,
   computed: boolean,
-  shape: any,
   getProp: PropGetter,
   validate?: Validator,
   customSet?: (value: T) => void,
@@ -186,7 +115,6 @@ const createStateProp = <T>(
 
       if (!thisObject) {
         thisObject = createModelProxy(
-          shape,
           descriptors,
           // custom get prop
           (prop) => {
@@ -483,12 +411,12 @@ const createActionProp = <T, A extends any[]>(
   };
 };
 
-const createModelProxy = <T extends StateBase>(
-  target: T,
+const createModelProxy = (
   descriptors: Record<string, PropertyDescriptor>,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
 ) => {
+  const target = {};
   return new Proxy(target, {
     get(_, prop) {
       return getProp(prop).get();
@@ -545,8 +473,8 @@ export type ModelFn = {
     <const TBase, TInit>(
       base: TBase,
       initFn: (base: Base<TBase>) => TInit,
-      options?: NoInfer<ModelOptions<State<Override<Base<TBase>, TInit>>>>
-    ): ReadonlyModel<State<Override<Base<TBase>, TInit>>>;
+      options?: NoInfer<ModelOptions<State<Inherit<Base<TBase>, TInit>>>>
+    ): ReadonlyModel<State<Inherit<Base<TBase>, TInit>>>;
   };
 
   <TInit>(init: TInit, options?: NoInfer<ModelOptions<State<TInit>>>): Model<
@@ -556,8 +484,8 @@ export type ModelFn = {
   <const TBase, TInit>(
     base: TBase,
     initFn: (base: NoInfer<Base<TBase>>) => TInit,
-    options?: NoInfer<ModelOptions<State<Override<Base<TBase>, TInit>>>>
-  ): Model<State<Override<Base<TBase>, TInit>>>;
+    options?: NoInfer<ModelOptions<State<Inherit<Base<TBase>, TInit>>>>
+  ): Model<State<Inherit<Base<TBase>, TInit>>>;
 };
 
 export const mergeDescriptors = (
@@ -579,7 +507,7 @@ export const mergeDescriptors = (
   });
 };
 
-const createModelFactory =
+const createFactory =
   (strict: boolean) =>
   (...args: any[]) => {
     const baseDescriptors: Record<string, PropertyDescriptor> = {};
@@ -597,9 +525,11 @@ const createModelFactory =
         Array.isArray(base) ? base : [base]
       );
     } else {
+      // OVERLOAD: model(init, options)
       [init, options] = args;
     }
 
+    // handle local model creation
     const localModel = local()?.get("model", () => {
       const s = createModel(
         strict,
@@ -624,14 +554,16 @@ const createModelFactory =
     return createModel(strict, initFunctions, baseDescriptors, init, options);
   };
 
-export const model: ModelFn = Object.assign(createModelFactory(false), {
-  strict: createModelFactory(true),
+export const model: ModelFn = Object.assign(createFactory(false), {
+  strict: createFactory(true),
 });
+
+type DescriptorMap = Record<string, PropertyDescriptor>;
 
 const createModel = <TInit>(
   strict: boolean,
   initFunctions: Set<AnyFunc>,
-  baseDescriptors: Record<string, PropertyDescriptor> | undefined,
+  baseDescriptors: DescriptorMap,
   init: TInit,
   { tags, rules, save, load }: ModelOptions<any> = {}
 ): Model<State<TInit>> => {
@@ -647,7 +579,7 @@ const createModel = <TInit>(
   let persistedValues: Record<string, any>;
   let descriptorsReady = false;
   const propInfoMap = new Map<string, PropInfo>();
-  const descriptors: Record<string, PropertyDescriptor> = {};
+  const descriptors: DescriptorMap = {};
   const onDispose = emitter();
 
   const getProp: PropGetter = (prop) => {
@@ -656,7 +588,7 @@ const createModel = <TInit>(
         "Access to model properties is not permitted during the model creation phase. It may be necessary to place this code within the `init()` function"
       );
     }
-    if (prop === MODEL_API_PROP) return apiProp;
+    if (prop === MODEL_TYPE) return apiProp;
     if (typeof prop !== "string") return undefinedProp;
     if (!(prop in descriptors)) return undefinedProp;
 
@@ -666,17 +598,19 @@ const createModel = <TInit>(
       const { get, set, value } = descriptors[prop];
       // is action
       if (typeof value === "function") {
-        propInfo = createActionProp(value, privateProxy);
+        if (value[NO_WRAP]) {
+          propInfo = { type: "unknown", get: () => value };
+        } else {
+          propInfo = createActionProp(value, privateProxy);
+        }
       } else {
         const isComputed = !!get;
         const getValue = get ?? (() => getPersistedValue(prop, value));
 
         propInfo = createStateProp(
           descriptors,
-          prop,
           getValue,
           isComputed,
-          target,
           getProp,
           api.rules[prop],
           set?.bind(privateProxy),
@@ -699,7 +633,7 @@ const createModel = <TInit>(
     return false;
   };
 
-  privateProxy = createModelProxy({}, descriptors, getProp, setProp);
+  privateProxy = createModelProxy(descriptors, getProp, setProp);
   const [{ dispose: factoryDispose }, target] = disposable(creator);
   onDispose.on(factoryDispose);
 
@@ -856,8 +790,8 @@ const createModel = <TInit>(
 
   proxy = strict
     ? // strict proxy has no setters
-      createModelProxy(target, descriptors, getPublicProp)
-    : createModelProxy(target, descriptors, getPublicProp, setProp);
+      createModelProxy(descriptors, getPublicProp)
+    : createModelProxy(descriptors, getPublicProp, setProp);
 
   onDispose.on(initDispose);
 
@@ -923,27 +857,8 @@ export const refresh: RefreshFn = (input: any, ...args: any[]) => {
   });
 };
 
-export type OnFn = {
-  (listenables: Listenable<any>[], listener: Listener<any>): VoidFunction;
-
-  <T>(listenable: Listenable<T>, listener: Listener<T>): VoidFunction;
-};
-
-export const on: OnFn = (
-  listenables: Listenable | Listenable[],
-  listener: Listener
-): any => {
-  const cleanup = emitter();
-  (Array.isArray(listenables) ? listenables : [listenables]).forEach(
-    (listenable) => {
-      cleanup.on(listenable.on(listener));
-    }
-  );
-  return cleanup.emit;
-};
-
 export const getModelApi = (value: any) => {
-  return value?.[MODEL_API_PROP] as ModelApi | undefined;
+  return value?.[MODEL_TYPE] as ModelApi | undefined;
 };
 
 export const isModel = (value: any) => {

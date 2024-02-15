@@ -1,4 +1,11 @@
-import { Listenable, Equal, OnceOptions, AnyFunc, NoInfer } from "./types";
+import {
+  Listenable,
+  Equal,
+  OnceOptions,
+  AnyFunc,
+  NoInfer,
+  Listener,
+} from "./types";
 import { NOOP } from "./utils";
 
 export type Emitter<T> = Listenable<T> & {
@@ -114,4 +121,23 @@ export const filter = <T>(
       });
     },
   };
+};
+
+export type OnFn = {
+  (listenables: Listenable<any>[], listener: Listener<any>): VoidFunction;
+
+  <T>(listenable: Listenable<T>, listener: Listener<T>): VoidFunction;
+};
+
+export const on: OnFn = (
+  listenables: Listenable | Listenable[],
+  listener: Listener
+): any => {
+  const cleanup = emitter();
+  (Array.isArray(listenables) ? listenables : [listenables]).forEach(
+    (listenable) => {
+      cleanup.on(listenable.on(listener));
+    }
+  );
+  return cleanup.emit;
 };

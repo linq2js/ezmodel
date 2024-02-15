@@ -1,12 +1,6 @@
-export type ModelTag<T> = {
-  readonly type: "tag";
-  readonly count: number;
-  readonly all: T[];
-  init: (model: T) => any;
-  each(callback: (model: T) => void): void;
-};
+import { Tag } from "./types";
 
-export const tag = <T = any>(init?: ModelTag<T>["init"]): ModelTag<T> => {
+export const tag = <T = any>(init?: Tag<T>["init"]): Tag<T> => {
   const models = new Set<T>();
 
   return {
