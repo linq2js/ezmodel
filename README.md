@@ -12,14 +12,69 @@ import React from "react";
 import { model } from "ezmodel";
 import { view } from "ezmodel/react";
 
-const counter = model({ count: 0 });
+const app = model({ count: 0 });
 
 const App = view(() => (
-  <button onClick={() => counter.count++}>{counter.count}</button>
+  <button onClick={() => app.count++}>{app.count}</button>
 ));
 ```
 
-This ensures automatic view updates as required. The structure or mutation of your state models is irrelevant; any syntactically correct code is effective.
+This ensures automatic updates to your views when necessary. The way you organize or modify your models is irrelevant; any syntactically valid code is effective.
+
+### Compare to Zustand
+
+```js
+import create from "zustand";
+
+export const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}));
+
+const App = () => {
+  const count = useStore((state) => state.count);
+  const increment = useStore((state) => state.increment);
+  <button onClick={increment}>{count}</button>;
+};
+```
+
+### Compare to Redux Toolkit
+
+```js
+import {
+  useSelector,
+  useDispatch,
+  createSlice,
+  configureStore,
+} from "@reduxjs/toolkit";
+
+const store = configureStore({ reducer: {} });
+
+const counterSlice = createSlice({
+  name: "counter",
+  initialState: { value: 0 },
+  reducers: {
+    increment: (state) => {
+      state.value += 1;
+    },
+  },
+});
+
+export const { increment } = counterSlice.actions;
+
+const App = () => {
+  const count = useSelector((state) => state.counter.value);
+  const dispatch = useDispatch();
+  return <button onClick={() => dispatch(increment)}>{count}</button>;
+};
+
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById("root")
+);
+```
 
 ## Installation
 
