@@ -157,7 +157,23 @@ const Jump = () => {
 
 ### Creating local models
 
-## Using model props factory
+The `model` can be used either globally or locally within a `view`.
+
+```js
+// global model
+const theme = model({ type: "dark" });
+
+const App = view(() => {
+  // local model
+  const counter = model({ count: 0 });
+
+  return <button onClick={() => counter.count++}>{counter.count}</button>;
+});
+```
+
+### Using model props factory
+
+TBD
 
 ## Advanced Usages
 
@@ -229,6 +245,24 @@ stale(app, "todos");
 
 // refresh todos and user properties
 refresh(app, ["todos", "user"]);
+```
+
+#### Pitfalls
+
+A model's computed property only re-computes when the related reactive values within it change. If a computed property references non-reactive variables from outside, we must manually call refresh whenever the external variables change.
+
+```js
+let count = 0;
+
+const counter = model({
+  get count() {
+    return count;
+  },
+  increment() {
+    count++;
+    refresh(this, "count"); // OR refresh(this)
+  },
+});
 ```
 
 ### Strict mode
@@ -340,7 +374,7 @@ const TodoList = view(() => {
 
 > Note: All Promise objects stored within a model property or returned as a result of a model method are converted into an `AsyncResult` object. `AsyncResult` is a wrapper for promise objects, pre-equipped with the following properties: `loading`, `data`, and `error`. This makes controlling the state of a Promise more straightforward. When the properties of `AsyncResult` are accessed within view(), the view will track changes to the `AsyncResult` and re-render accordingly.
 
-### Inheritance and props builder
+### Inheritance
 
 In practice, using inheritance techniques helps make the code clearer and simpler. `ezmodel` provides basic support for inheritance.
 
@@ -423,9 +457,15 @@ const cyborg = model({
 
 ### Handling async action dispatching
 
+TBD
+
 ### Model lifecycle
 
+TBD
+
 ### Listening action dispatches
+
+TBD
 
 ### Validating model properties
 
@@ -470,11 +510,62 @@ expect(counter.count).toBe(2);
 
 ### Fine-grained reactivity
 
+To control the rendering of small parts within a large component without creating many child components, we apply the technique of fine-grained reactivity.
+
+```js
+import { rx } from "ezmodel/react";
+
+const profile = model({ name: "Ging", age: 100 });
+
+// no need to wrap with view(), when profile changed, it does not make ProfilePage re-renders
+const ProfilePage = () => {
+  // a lot of hooks here
+  useSomething();
+  useSomething();
+  useSomething();
+
+  return (
+    <>
+      <div>Name: {rx(() => profile.name)}</div>
+      <div>Age: {rx(() => profile.age)}</div>
+      <OtherComp />
+    </>
+  );
+};
+```
+
+### Persist models
+
+`ezmodel` provides `load` and `save` options to persist the state of the model. The `load` function returns the persisted state of the model, and the model will use the values of properties returned from the `load` function, while other properties retain their default values. The `save` function is called whenever there are changes to any properties of the model.
+
+```js
+// Assuming the saved app state includes only prop1 and prop2.
+localStorage.setItem("app", JSON.stringify({ prop1: 1, prop2: 2 }));
+
+const app = model(
+  { prop1: 0, prop2: 0, prop3: 3 },
+  {
+    load() {
+      return JSON.parse(localStorage.getItem("app")) || {};
+    },
+    save(state) {
+      localStorage.setItem("app", JSON.stringify(state));
+    },
+  }
+);
+
+console.log(app.prop1); // 1
+console.log(app.prop2); // 2
+console.log(app.prop3); // 3
+```
+
 ### Tagging models
+
+TBD
 
 ### Model is just vanilla JS
 
-The model is purely vanilla JavaScript and can operate universally, including on the server side. This allows for seamless sharing of logic between server and client sides.
+The model is purely vanilla JavaScript and can operate universally, including on the server side. This allows for seamless sharing of logic between server and client sides or across libraries.
 
 ```ts
 import { model } from "ezmodel";
@@ -491,6 +582,8 @@ const createTodo = (props: { id: number; title: string }) => {
 };
 ```
 
+## How `ezmodel` work
+
 ## API References
 
 ### model
@@ -506,5 +599,3 @@ const createTodo = (props: { id: number; title: string }) => {
 ### refresh
 
 ### stale
-
-### useStable

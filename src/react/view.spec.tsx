@@ -64,17 +64,25 @@ describe("view", () => {
 
   test("local model and effect", () => {
     const log = jest.fn();
-    const Comp = view((props: { name: string }) => {
+    const Comp = view((props: { name: string; id: number }) => {
       const [version, setVersion] = useState(0);
-      const counter = model(() => ({
-        count: 0,
-        init() {
-          return () => log("dispose model");
+      const counter = model(
+        {
+          count: 0,
+          id: props.id,
+          init() {
+            return () => log("dispose model");
+          },
+          increment() {
+            this.count++;
+          },
+          // this is stable method, version is always up to date
+          doSomething() {
+            log("version:" + version);
+          },
         },
-        increment() {
-          this.count++;
-        },
-      }));
+        { unstable: { id: true } }
+      );
 
       effect(() => {
         log(`count:${counter.count}`);
@@ -90,12 +98,14 @@ describe("view", () => {
         <>
           <button onClick={counter.increment}>increment</button>
           <button onClick={() => setVersion(version + 1)}>version</button>
+          <button onClick={counter.doSomething}>something</button>
+          <button>id:{counter.id}</button>
           <div>{counter.count}</div>
         </>
       );
     });
 
-    const { getByText, rerender, unmount } = render(<Comp name="1" />);
+    const { getByText, rerender, unmount } = render(<Comp name="1" id={1} />);
     const $button = getByText("increment");
 
     getByText("0");
@@ -104,17 +114,26 @@ describe("view", () => {
     fireEvent.click($button);
     getByText("2");
 
-    rerender(<Comp name="2" />);
+    getByText("id:1");
+
+    rerender(<Comp name="2" id={2} />);
+
+    getByText("id:2");
     // The local model remains across renderings
     getByText("2");
     fireEvent.click($button);
     getByText("3");
 
     // changing version will re-ren effect
-    fireEvent.click(getByText("version"));
-    fireEvent.click(getByText("version"));
+    fireEvent.click(getByText("version")); // version = 1
+    fireEvent.click(getByText("version")); // version = 2
 
     fireEvent.click($button);
+
+    fireEvent.click(getByText("something")); // call doSomething
+    // change version
+    fireEvent.click(getByText("version")); // version = 3
+    fireEvent.click(getByText("something")); // call doSomething
 
     unmount();
 
@@ -128,6 +147,10 @@ describe("view", () => {
       ["dispose effect"],
       ["count:3"],
       ["count:4"],
+      ["version:2"],
+      ["dispose effect"],
+      ["count:4"],
+      ["version:3"],
       ["dispose effect"],
       ["dispose model"],
     ]);

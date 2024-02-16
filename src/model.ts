@@ -18,11 +18,52 @@ import {
   Model,
   MODEL_TYPE,
   NO_WRAP,
+  Dictionary,
 } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
 export type ModelOptions<T> = {
   tags?: Tag<T>[];
+
+  /**
+   * LOCAL MODEL ONLY: the model will update specified props according to new input props
+   * ```js
+   * // WITHOUT UNSTABLE OPTION
+   * const counter = model({ count: props.initCount })
+   * console.log(counter.count)
+   *
+   * // initial rendering:
+   * props.initCount = 1
+   * counter.count = 1
+   *
+   * // changing counter.count to 2
+   * props.initCount = 1
+   * counter.count = 2
+   *
+   * // re-render with new props { initCount: 3 }
+   * props.initCount = 3
+   * counter.count = 2 // the count value is not the same as initCount
+   *
+   * // WITH UNSTABLE OPTION
+   * const counter = model({ count: props.initCount }, { unstable: { count: true } })
+   * console.log(counter.count)
+   *
+   * // initial rendering:
+   * props.initCount = 1
+   * counter.count = 1
+   *
+   * // changing counter.count to 2
+   * props.initCount = 1
+   * counter.count = 2
+   *
+   * // re-render with new props { initCount: 3 }
+   * props.initCount = 3
+   * counter.count = 3 // the count value is the same as initCount
+   * ```
+   */
+  unstable?: {
+    [key in keyof T as T[key] extends AnyFunc ? never : key]?: boolean;
+  };
 
   rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
 
@@ -59,7 +100,10 @@ type StatePropInfo = UpdatablePropInfo & {
   set(value: any): void;
 };
 
-type ActionPropInfo = UpdatablePropInfo & { type: "action" };
+type ActionPropInfo = UpdatablePropInfo & {
+  type: "action";
+  setDispatcher(dispatcher: AnyFunc): void;
+};
 type UnknownPropInfo = PropInfoBase & { type: "unknown" };
 
 type PropInfo = StatePropInfo | ActionPropInfo | UnknownPropInfo;
@@ -75,7 +119,8 @@ type ModelApi = {
   refresh: AnyFunc;
   initFunctions: Set<AnyFunc>;
   descriptors: DescriptorMap;
-  rules: Record<string, Validator | undefined>;
+  rules: Dictionary<Validator | undefined>;
+  configure(props: Dictionary, unstable?: Dictionary): void;
 };
 
 const createStateProp = <T>(
@@ -408,6 +453,9 @@ const createActionProp = <T, A extends any[]>(
     dispose() {
       onChange.clear();
     },
+    setDispatcher(dispatcher: AnyFunc) {
+      dispatch = dispatcher;
+    },
   };
 };
 
@@ -465,9 +513,11 @@ export type State<T> = T extends () => infer R ? R : T;
 
 export type ModelFn = {
   strict: {
+    <TInit>(init: TInit): ReadonlyModel<State<TInit>>;
+
     <TInit>(
       init: TInit,
-      options?: NoInfer<ModelOptions<State<TInit>>>
+      options: ModelOptions<State<NoInfer<TInit>>>
     ): ReadonlyModel<State<TInit>>;
 
     <const TBase, TInit>(
@@ -477,14 +527,16 @@ export type ModelFn = {
     ): ReadonlyModel<State<Inherit<Base<TBase>, TInit>>>;
   };
 
-  <TInit>(init: TInit, options?: NoInfer<ModelOptions<State<TInit>>>): Model<
+  <TInit>(init: TInit): Model<State<TInit>>;
+
+  <TInit>(init: TInit, options: ModelOptions<State<NoInfer<TInit>>>): Model<
     State<TInit>
   >;
 
   <const TBase, TInit>(
     base: TBase,
     initFn: (base: NoInfer<Base<TBase>>) => TInit,
-    options?: NoInfer<ModelOptions<State<Inherit<Base<TBase>, TInit>>>>
+    options?: ModelOptions<State<Inherit<Base<TBase>, NoInfer<TInit>>>>
   ): Model<State<Inherit<Base<TBase>, TInit>>>;
 };
 
@@ -548,6 +600,9 @@ const createFactory =
     });
 
     if (localModel) {
+      if (typeof init !== "function") {
+        getModelApi(localModel.value)?.configure(init, options?.unstable);
+      }
       return localModel.value as any;
     }
 
@@ -719,6 +774,28 @@ const createModel = <TInit>(
       }
     });
   };
+  const configure = (props: Dictionary, unstable: Dictionary = {}) => {
+    Object.entries(props).forEach(([key, value]) => {
+      const info = propInfoMap.get(key);
+      if (!info) return;
+      if (info.type === "action") {
+        if (typeof value !== "function") {
+          return;
+        }
+        info.setDispatcher(value);
+        return;
+      }
+
+      if (info.type !== "state") {
+        return;
+      }
+
+      // not unstable state
+      if (!unstable[key]) return;
+      info.set(value);
+    });
+  };
+
   const undefinedProp: UnknownPropInfo = { type: "unknown", get: NOOP };
   const api: ModelApi = {
     refresh,
@@ -727,6 +804,7 @@ const createModel = <TInit>(
     descriptors,
     initFunctions,
     rules: {},
+    configure,
   };
   const apiProp: UnknownPropInfo = {
     type: "unknown",

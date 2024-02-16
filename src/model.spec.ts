@@ -39,7 +39,7 @@ describe("basic usages", () => {
 
   test("validate with manual validation function", () => {
     const counter = model(
-      { count: 1 },
+      { count: 1, doSomething() {} },
       { rules: { count: (value) => value > 0 } }
     );
     expect(() => (counter.count = 0)).toThrow("Invalid 'count' value");
