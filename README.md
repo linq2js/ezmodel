@@ -93,6 +93,8 @@ ReactDOM.render(
     - [Compare to Redux Toolkit](#compare-to-redux-toolkit)
   - [Table of contents](#table-of-contents)
   - [Installation](#installation)
+    - [npm](#npm)
+    - [yarn](#yarn)
   - [Basic Usages](#basic-usages)
     - [Creating a global models](#creating-a-global-models)
     - [Creating reactive view](#creating-reactive-view)
@@ -103,7 +105,6 @@ ReactDOM.render(
     - [Strict mode](#strict-mode)
     - [Adding side effects](#adding-side-effects)
     - [Handling async data](#handling-async-data)
-    - [Inheritance](#inheritance)
       - [Why shouldn't we use object spread operator?](#why-shouldnt-we-use-object-spread-operator)
     - [Handling action statuses](#handling-action-statuses)
     - [Model lifecycle](#model-lifecycle)
@@ -121,13 +122,13 @@ ReactDOM.render(
 
 ## Installation
 
-NPM
+### npm
 
 ```bash
 npm i ezmodel
 ```
 
-YARN
+### yarn
 
 ```bash
 yarn add ezmodel
@@ -409,70 +410,6 @@ const TodoList = view(() => {
 ```
 
 > Note: All Promise objects stored within a model property or returned as a result of a model method are converted into an `AsyncResult` object. `AsyncResult` is a wrapper for promise objects, pre-equipped with the following properties: `loading`, `data`, and `error`. This makes controlling the state of a Promise more straightforward. When the properties of `AsyncResult` are accessed within view(), the view will track changes to the `AsyncResult` and re-render accordingly.
-
-### Inheritance
-
-In practice, using inheritance techniques helps make the code clearer and simpler. `ezmodel` provides basic support for inheritance.
-
-```js
-import { model } from "ezmodel";
-
-const shape = model({ color: "white" });
-const polygon = model(
-  // base props
-  shape,
-  // polygon props
-  () => ({
-    sides: 0,
-    display() {
-      console.log(
-        `A polygon with ${this.sides} sides and color ${this.color}.`
-      );
-    },
-  })
-);
-const triangle = model(
-  polygon,
-  // triangle props
-  () => ({
-    // override props of polygon
-    color: "red",
-    sides: 3,
-  })
-);
-
-triangle.display(); // A polygon with 3 sides and color red.
-```
-
-We can also create models with properties inherited from multiple other models.
-
-```js
-import { model } from "ezmodel";
-
-const canEat = model({
-  eat() {
-    console.log("eating");
-  },
-});
-
-const canRun = model({
-  run() {
-    console.log("running");
-  },
-});
-
-const person = model(
-  // base models
-  [canEat, canRun],
-  () => ({
-    name: "Ging",
-  })
-);
-
-person.eat(); // eating
-person.run(); // running
-person.name; // Ging
-```
 
 #### Why shouldn't we use object spread operator?
 

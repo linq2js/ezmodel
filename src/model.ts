@@ -114,13 +114,15 @@ type PropSetter = (prop: string | symbol, value: any) => boolean;
 type Validator = (value: any, transform?: (value: any) => void) => void;
 
 type ModelApi = {
+  strict: boolean;
   dispose: AnyFunc;
   stale: AnyFunc;
   refresh: AnyFunc;
-  initFunctions: Set<AnyFunc>;
+  constructor: () => StateBase;
   descriptors: DescriptorMap;
   rules: Dictionary<Validator | undefined>;
   configure(props: Dictionary, unstable?: Dictionary): void;
+  options: ModelOptions<any>;
 };
 
 const createStateProp = <T>(
@@ -519,12 +521,6 @@ export type ModelFn = {
       init: TInit,
       options: ModelOptions<State<NoInfer<TInit>>>
     ): ReadonlyModel<State<TInit>>;
-
-    <const TBase, TInit>(
-      base: TBase,
-      init: (base: NoInfer<Base<TBase>>) => TInit,
-      options?: NoInfer<ModelOptions<State<Inherit<Base<TBase>, TInit>>>>
-    ): ReadonlyModel<State<Inherit<Base<TBase>, TInit>>>;
   };
 
   <TInit>(init: TInit): Model<State<TInit>>;
@@ -532,64 +528,17 @@ export type ModelFn = {
   <TInit>(init: TInit, options: ModelOptions<State<NoInfer<TInit>>>): Model<
     State<TInit>
   >;
-
-  <const TBase, TInit>(
-    base: TBase,
-    initFn: (base: NoInfer<Base<TBase>>) => TInit,
-    options?: ModelOptions<State<Inherit<Base<TBase>, NoInfer<TInit>>>>
-  ): Model<State<Inherit<Base<TBase>, TInit>>>;
-};
-
-export const mergeDescriptors = (
-  initFunctions: Set<AnyFunc>,
-  baseDescriptors: Record<string, PropertyDescriptor>,
-  models: any[]
-) => {
-  models.forEach((model) => {
-    const api = getModelApi(model);
-    if (api) {
-      api.initFunctions.forEach((init) => initFunctions.add(init));
-      Object.assign(baseDescriptors, api.descriptors);
-    } else {
-      if (typeof model.init === "function") {
-        initFunctions.add(model.init);
-      }
-      Object.assign(baseDescriptors, Object.getOwnPropertyDescriptors(model));
-    }
-  });
 };
 
 const createFactory =
   (strict: boolean) =>
-  (...args: any[]) => {
-    const baseDescriptors: Record<string, PropertyDescriptor> = {};
-    const initFunctions = new Set<AnyFunc>();
-    let init: any;
-    let options: ModelOptions<any> | undefined;
-
-    // OVERLOAD: modal(base, initFn, options?)
-    if (typeof args[1] === "function") {
-      let base;
-      [base, init, options] = args;
-      mergeDescriptors(
-        initFunctions,
-        baseDescriptors,
-        Array.isArray(base) ? base : [base]
-      );
-    } else {
-      // OVERLOAD: model(init, options)
-      [init, options] = args;
-    }
+  (init: Dictionary | AnyFunc, options?: ModelOptions<any>) => {
+    const constructor =
+      typeof init === "function" ? (init as AnyFunc) : () => init;
 
     // handle local model creation
     const localModel = local()?.get("model", () => {
-      const s = createModel(
-        strict,
-        initFunctions,
-        baseDescriptors,
-        init,
-        options
-      );
+      const s = createModel(strict, constructor, options);
 
       return {
         value: s,
@@ -606,7 +555,7 @@ const createFactory =
       return localModel.value as any;
     }
 
-    return createModel(strict, initFunctions, baseDescriptors, init, options);
+    return createModel(strict, constructor, options);
   };
 
 export const model: ModelFn = Object.assign(createFactory(false), {
@@ -615,22 +564,15 @@ export const model: ModelFn = Object.assign(createFactory(false), {
 
 type DescriptorMap = Record<string, PropertyDescriptor>;
 
-const createModel = <TInit>(
+const createModel = <T extends StateBase>(
   strict: boolean,
-  initFunctions: Set<AnyFunc>,
-  baseDescriptors: DescriptorMap,
-  init: TInit,
-  { tags, rules, save, load }: ModelOptions<any> = {}
-): Model<State<TInit>> => {
+  constructor: () => T,
+  options: ModelOptions<any> = {}
+): Model<T> => {
+  const { tags, rules, save, load } = options;
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
-  const creator =
-    typeof init === "function"
-      ? () => {
-          return init(privateProxy);
-        }
-      : () => init;
   let persistedValues: Record<string, any>;
   let descriptorsReady = false;
   const propInfoMap = new Map<string, PropInfo>();
@@ -689,18 +631,19 @@ const createModel = <TInit>(
   };
 
   privateProxy = createModelProxy(descriptors, getProp, setProp);
-  const [{ dispose: factoryDispose }, target] = disposable(creator);
+  const [{ dispose: factoryDispose }, target] = disposable(constructor);
   onDispose.on(factoryDispose);
 
-  if (typeof target.init === "function") {
-    initFunctions.add(target.init);
+  if (isModel<T>(target)) {
+    return target;
   }
 
-  Object.assign(
-    descriptors,
-    baseDescriptors,
-    Object.getOwnPropertyDescriptors(target)
-  );
+  Object.assign(descriptors, Object.getOwnPropertyDescriptors(target));
+
+  const init =
+    typeof descriptors.init?.value === "function"
+      ? descriptors.init.value
+      : undefined;
 
   descriptorsReady = true;
 
@@ -802,9 +745,11 @@ const createModel = <TInit>(
     stale,
     dispose,
     descriptors,
-    initFunctions,
+    constructor,
     rules: {},
     configure,
+    strict,
+    options,
   };
   const apiProp: UnknownPropInfo = {
     type: "unknown",
@@ -858,12 +803,12 @@ const createModel = <TInit>(
       }
     });
 
-    initFunctions.forEach((init) => {
+    if (init) {
       const dispose = init.call(privateProxy);
       if (typeof dispose === "function") {
         onDispose.on(dispose);
       }
-    });
+    }
   });
 
   proxy = strict
@@ -939,6 +884,31 @@ export const getModelApi = (value: any) => {
   return value?.[MODEL_TYPE] as ModelApi | undefined;
 };
 
-export const isModel = (value: any) => {
+export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
+};
+
+export type FromFn = {
+  <T extends Model<any>>(model: T): T;
+  <const T extends readonly Model<any>[]>(models: T): T;
+};
+
+export const from: FromFn = (
+  input: Model<any> | readonly Model<any>[]
+): any => {
+  const isMultiple = Array.isArray(input);
+  const models = isMultiple ? input : [input];
+  const clones = models.map((m) => {
+    const api = getModelApi(m);
+    if (!api) {
+      throw new Error("The object is not model");
+    }
+    if (api.strict) {
+      return model.strict(api.constructor, api.options);
+    }
+
+    return model(api.constructor, api.options);
+  });
+
+  return isMultiple ? clones : clones[0];
 };

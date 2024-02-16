@@ -1,6 +1,6 @@
 import { alter } from "./alter";
 import { filter } from "./emitter";
-import { dispose, refresh, stale, model } from "./model";
+import { dispose, refresh, stale, model, from } from "./model";
 import { z } from "zod";
 
 describe("basic usages", () => {
@@ -115,70 +115,6 @@ describe("basic usages", () => {
     expect(app.allDone).toBeFalsy();
     expect(app.todos[0].done).toBeFalsy();
     expect(app.todos[1].done).toBeFalsy();
-  });
-
-  test("multiple inheritance", () => {
-    const log = jest.fn();
-    // animal is plain object
-    const animal = {
-      init() {
-        log("animal.init");
-        return () => log("animal.dispose");
-      },
-      name: "animal",
-      get class() {
-        log("animal");
-        return "animal";
-      },
-    };
-    const wingedAnimal = model([animal], () => ({
-      init() {
-        log("wingedAnimal.init");
-        return () => log("wingedAnimal.dispose");
-      },
-      // override name prop of animal
-      name: false,
-      get class() {
-        log("wingedAnimal");
-        return "wingedAnimal";
-      },
-      get wings() {
-        return true;
-      },
-    }));
-    const bat = model([animal, wingedAnimal], (base) => ({
-      init() {
-        log("parent:" + base.class);
-        log("bat.init");
-        return () => log("bat.dispose");
-      },
-      // override name prop of both animal and wingedAnimal
-      get name() {
-        return "bat";
-      },
-    }));
-
-    expect(bat.name).toBe("bat");
-    expect(bat.class).toBe("wingedAnimal");
-    expect(Object.keys(bat)).toEqual(["init", "name", "class", "wings"]);
-    // should not call class property of animal
-    dispose(bat);
-    expect(log.mock.calls).toEqual([
-      // create wingedAnimal
-      ["animal.init"],
-      ["wingedAnimal.init"],
-      // create bat
-      ["animal.init"],
-      ["wingedAnimal.init"],
-      // wingedAnimal.class call
-      ["wingedAnimal"],
-      // bat init
-      ["parent:wingedAnimal"],
-      ["bat.init"],
-      ["animal.dispose"],
-      ["wingedAnimal.dispose"],
-      ["bat.dispose"],
-    ]);
   });
 
   test("computed prop", () => {
@@ -458,5 +394,29 @@ describe("computed", () => {
     expect(sum.value).toBe(6);
     s2.increment();
     expect(sum.value).toBe(7);
+  });
+});
+
+describe("from", () => {
+  test("clone one", () => {
+    const parent = model({ count: 1 });
+    const child = from(parent);
+    expect(child.count).toBe(1);
+    child.count++;
+    // the change from child does not impact the parent
+    expect(parent.count).toBe(1);
+  });
+
+  test("clone many", () => {
+    const parent1 = model({ count: 1 });
+    const parent2 = model({ name: "Ging" });
+    const [child1, child2] = from([parent1, parent2]);
+    expect(child1.count).toBe(1);
+    child1.count++;
+    child2.name = "new name";
+
+    // the change from children does not impact the parents
+    expect(parent1.count).toBe(1);
+    expect(parent2.name).toBe("Ging");
   });
 });
