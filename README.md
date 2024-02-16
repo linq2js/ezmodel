@@ -8,14 +8,10 @@
 2. Always wrap your models with `model()`.
 
 ```js
-import { model } from "ezmodel";
-import { view, model } from "ezmodel/react";
+import { model, view } from "ezmodel/react";
 
 const app = model({ count: 0 });
-
-const App = view(() => (
-  <button onClick={() => app.count++}>{app.count}</button>
-));
+const App = view(() => <div onClick={() => app.count++}>{app.count}</div>);
 ```
 
 This ensures automatic updates to your views when necessary. The way you organize or modify your models is irrelevant; any syntactically valid code is effective.
@@ -29,9 +25,7 @@ const countAtom = atom(0);
 
 const App = () => {
   const [count, setCount] = useAtom(countAtom);
-  return (
-    <button onClick={() => setCount((prev) => prev + 1)}>{app.count}</button>
-  );
+  return <div onClick={() => setCount((prev) => prev + 1)}>{app.count}</div>;
 };
 ```
 
@@ -48,7 +42,7 @@ export const useStore = create((set) => ({
 const App = () => {
   const count = useStore((state) => state.count);
   const increment = useStore((state) => state.increment);
-  <button onClick={increment}>{count}</button>;
+  return <div onClick={increment}>{count}</div>;
 };
 ```
 
@@ -79,7 +73,7 @@ export const { increment } = counterSlice.actions;
 const App = () => {
   const count = useSelector((state) => state.counter.value);
   const dispatch = useDispatch();
-  return <button onClick={() => dispatch(increment)}>{count}</button>;
+  return <div onClick={() => dispatch(increment)}>{count}</div>;
 };
 
 ReactDOM.render(
@@ -89,6 +83,41 @@ ReactDOM.render(
   document.getElementById("root")
 );
 ```
+
+## Table of contents
+
+- [`ezmodel`](#ezmodel)
+  - [Introduction](#introduction)
+    - [Compare to Jotai](#compare-to-jotai)
+    - [Compare to Zustand](#compare-to-zustand)
+    - [Compare to Redux Toolkit](#compare-to-redux-toolkit)
+  - [Table of contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Basic Usages](#basic-usages)
+    - [Creating a global models](#creating-a-global-models)
+    - [Creating reactive view](#creating-reactive-view)
+    - [Creating local models](#creating-local-models)
+  - [Advanced Usages](#advanced-usages)
+    - [Computed/derived model props](#computedderived-model-props)
+      - [Pitfalls](#pitfalls)
+    - [Strict mode](#strict-mode)
+    - [Adding side effects](#adding-side-effects)
+    - [Handling async data](#handling-async-data)
+    - [Inheritance](#inheritance)
+      - [Why shouldn't we use object spread operator?](#why-shouldnt-we-use-object-spread-operator)
+    - [Handling action statuses](#handling-action-statuses)
+    - [Model lifecycle](#model-lifecycle)
+    - [Validating model properties](#validating-model-properties)
+    - [Fine-grained reactivity](#fine-grained-reactivity)
+    - [Persist models](#persist-models)
+    - [Model is just vanilla JS](#model-is-just-vanilla-js)
+  - [How `ezmodel` work](#how-ezmodel-work)
+  - [API References](#api-references)
+    - [model and model.strict](#model-and-modelstrict)
+    - [effect](#effect)
+    - [view](#view)
+    - [refresh](#refresh)
+    - [stale](#stale)
 
 ## Installation
 
@@ -134,6 +163,8 @@ character.jump(); // jumping
 The `ezmodel` `view` is a higher-order component that takes a render function as an argument and returns a component wrapper. The render function is executed during the rendering process of the component wrapper. Every access to any model property is tracked, and the component wrapper will re-render whenever any of those model properties change.
 
 ```js
+import { view } from "ezmodel/react";
+
 const CharacterInfo = view(() => {
   // read name from character
   return <div>{character.name}</div>;
@@ -160,6 +191,8 @@ const Jump = () => {
 The `model` can be used either globally or locally within a `view`.
 
 ```js
+import { model } from "ezmodel";
+
 // global model
 const theme = model({ type: "dark" });
 
@@ -171,10 +204,6 @@ const App = view(() => {
 });
 ```
 
-### Using model props factory
-
-TBD
-
 ## Advanced Usages
 
 ### Computed/derived model props
@@ -182,6 +211,8 @@ TBD
 Computed model properties are a feature that allows us to declare a property whose value is derived from the values of other properties within the same model or from other models. To declare a computed property, we use the object getter syntax.
 
 ```js
+import { model } from "ezmodel";
+
 const counter = model({
   count: 1,
   // The doubledCount property utilizes the count property. When the count property changes, the doubledCount property will also re-compute.
@@ -203,6 +234,8 @@ const sum = model({
 Computed properties can include complex calculations that are only executed when the computed property is accessed. Additionally, computed properties memoize the results for subsequent accesses, preventing the calculation function from being called again.
 
 ```js
+import { model } from "ezmodel";
+
 const app = model({
   otherValue: 1,
   get doHeavyComputation() {
@@ -223,7 +256,7 @@ console.log(app.doHeavyComputation);
 To force `ezmodel` to re-compute the values of computed properties, we can use the `refresh()` or `stale()` functions.
 
 ```js
-import { refresh, stale } from "ezmodel";
+import { model, refresh, stale } from "ezmodel";
 
 const app = model({
   get todos() {
@@ -252,6 +285,8 @@ refresh(app, ["todos", "user"]);
 A model's computed property only re-computes when the related reactive values within it change. If a computed property references non-reactive variables from outside, we must manually call refresh whenever the external variables change.
 
 ```js
+import { model } from "ezmodel";
+
 let count = 0;
 
 const counter = model({
@@ -308,8 +343,7 @@ counter.count++; // no log
 `ezmodel` provides a `wait()` function for handling asynchronous data. `wait()` takes one or more Promise objects and will return the resolved data if the Promise is fulfilled, or throw an error if the Promise is rejected, and will throw the Promise object itself if it is still pending. The nearest `Suspense` and `ErrorBoundary` wrappers will catch the outcomes of `wait()` and proceed to render the corresponding fallback.
 
 ```jsx
-import { wait, model } from "ezmodel";
-import { view } from "ezmodel/react";
+import { wait, model } from "ezmodel/react";
 import { ErrorBoundary } from "react-error-boundary";
 
 const app = model({
@@ -348,6 +382,8 @@ const App = () => {
 We can also manually handle statuses (`loading`, `error`) of asynchronous data.
 
 ```jsx
+import { view } from "ezmodel/react";
+
 const TodoList = view(() => {
   if (app.todos.loading) {
     // custom loading indicator
@@ -411,6 +447,8 @@ triangle.display(); // A polygon with 3 sides and color red.
 We can also create models with properties inherited from multiple other models.
 
 ```js
+import { model } from "ezmodel";
+
 const canEat = model({
   eat() {
     console.log("eating");
@@ -441,6 +479,8 @@ person.name; // Ging
 When you use the object spread operator, all properties with custom getters must be evaluated before copying, which can be inefficient and may lead to unintended side effects. In contrast, `ezmodel` uses `Object.getOwnPropertyDescriptors` to read all properties of one or more objects while skipping the execution of object getters.
 
 ```js
+import { model } from "ezmodel";
+
 const machine = model({
   get heavyComputation() {},
 });
@@ -455,17 +495,114 @@ const cyborg = model({
 });
 ```
 
-### Handling async action dispatching
+### Handling action statuses
 
-TBD
+Each model method is converted into an action object automatically. The action object has the following properties: `called`, `result`, `prevResult`, `error`, `loading`, `awaited` etc. Using these properties helps us understand the operational status of the action.
+
+```js
+import { model } from "ezmodel";
+
+const app = model({
+  synAction(payload) {
+    return payload;
+  },
+  async asyncAction(payload) {
+    return payload;
+  },
+  failAction() {
+    throw new Error("failed");
+  },
+});
+
+// handle sync action
+console.log(app.syncAction.called); // the syncAction is not called yet
+console.log(app.syncAction.result); // => undefined
+const result1 = app.syncAction(1); // result1 = 1
+console.log(app.syncAction.result); // => 1
+console.log(app.syncAction.prevResult); // => undefined
+app.syncAction(2);
+console.log(app.syncAction.result); // => 2
+console.log(app.syncAction.prevResult); // => 1
+
+// handle async action
+console.log(app.asyncAction.loading); // => false
+app.asyncAction(1);
+console.log(app.asyncAction.loading); // => true
+// promise is pending
+console.log(app.asyncAction.awaited); // => undefined
+// wait a bit for promise fulfilled
+console.log(app.asyncAction.loading); // => false
+console.log(app.asyncAction.result); // => Promise(1)
+// awaited contains value of fulfilled promise
+console.log(app.asyncAction.awaited); // => 1
+
+// handle error
+try {
+  app.failAction();
+} catch (ex) {
+  console.log(ex); // => Error('failed')
+}
+
+console.log(app.failAction.error); // => Error('failed')
+console.log(app.failAction.result); // => undefined
+```
+
+When accessing action properties within a view, ezmodel will automatically track the action's status and re-render when there are changes.
+
+```jsx
+import { model, view } from "ezmodel/react";
+
+const app = model({
+  async submitData(data) {
+    // code submit data here
+  },
+});
+
+const Form = view(() => {
+  return (
+    <form action={app.submitData}>
+      {app.submitData.loading && <div>Submitting...</div>}
+      {app.submitData.error && <div>{app.submitData.error.message}</div>}
+    </form>
+  );
+});
+```
+
+We can use the on function to listen for the dispatch of one or more actions.
+
+```ts
+import { model, on } from "ezmodel";
+
+const app = model({
+  action1(p1: number, p2: string) {},
+  action2() {},
+});
+
+on(app.action1, (args /* args is [number, string] */) => {
+  console.log("action1 dispatched");
+});
+
+on([app.action1, app.action2], (args /* args is any[] */) => {});
+```
 
 ### Model lifecycle
 
-TBD
+A model has the following lifecycle stages:
 
-### Listening action dispatches
+- **init**: This stage occurs after the model object is created.
+- **dispose**: This stage occurs when `dispose(model)` is called, or a local model is disposed of when the component unmounts.
 
-TBD
+```js
+const app = model({
+  // init
+  init() {
+    // the dispose function is optional
+    return () => {
+      // dispose
+    };
+  },
+});
+```
 
 ### Validating model properties
 
@@ -559,10 +696,6 @@ console.log(app.prop2); // 2
 console.log(app.prop3); // 3
 ```
 
-### Tagging models
-
-TBD
-
 ### Model is just vanilla JS
 
 The model is purely vanilla JavaScript and can operate universally, including on the server side. This allows for seamless sharing of logic between server and client sides or across libraries.
@@ -586,13 +719,9 @@ const createTodo = (props: { id: number; title: string }) => {
 
 ## API References
 
-### model
-
-### model.strict
+### model and model.strict
 
 ### effect
-
-### tag
 
 ### view
 
