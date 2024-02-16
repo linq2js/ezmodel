@@ -7,8 +7,6 @@ import { trackable } from "./trackable";
 import {
   AnyFunc,
   AsyncResult,
-  Base,
-  Inherit,
   Listenable,
   NoInfer,
   Rule,
