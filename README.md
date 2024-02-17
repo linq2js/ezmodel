@@ -596,7 +596,7 @@ expect(counter.count).toBe(2);
 To control the rendering of small parts within a large component without creating many child components, we apply the technique of fine-grained reactivity.
 
 ```js
-import { rx } from "ezmodel/react";
+import { model, rx } from "ezmodel/react";
 
 const profile = model({ name: "Ging", age: 100 });
 
