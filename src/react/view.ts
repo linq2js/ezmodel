@@ -12,7 +12,12 @@ import { scope } from "../scope";
 import { LocalData, local } from "../local";
 import { disposable } from "../disposable";
 
-export type ViewOptions = { name?: string };
+export type ViewOptions = {
+  /**
+   * a  display name for debugging purpose
+   */
+  name?: string;
+};
 
 export const view = <P extends Record<string, any>>(
   render: (props: P) => ReactElement,

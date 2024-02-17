@@ -2,7 +2,9 @@
 
 ## Introduction
 
-`ezmodel` is an effective library for state management, equipped with two functions and two principles:
+`ezmodel` is a state management library designed to simplify the handling of application state in web development projects. It focuses on providing an intuitive and straightforward API for managing both local and global state within applications
+
+`ezmodel` equipped with two functions and two principles:
 
 1. Always wrap your components with `view()`.
 2. Always wrap your models with `model()`.
@@ -16,37 +18,73 @@ const App = view(() => <div onClick={() => app.count++}>{app.count}</div>);
 
 This ensures automatic updates to your views when necessary. The way you organize or modify your models is irrelevant; any syntactically valid code is effective.
 
-### Compare to Jotai
+### Key Features
+
+- Simplicity and Ease of Use: `ezmodel` aims to reduce the complexity often associated with state management in web applications. It offers a minimalistic API, making it accessible for developers of all skill levels.
+- Reactivity: The library employs a reactive programming model, ensuring that changes in the application state are automatically and efficiently propagated throughout the UI. This reactivity is central to maintaining consistent and dynamic user interfaces.
+- Flexible State Modeling: `ezmodel` supports a wide range of state modeling scenarios, from simple local state management to complex global state scenarios. This flexibility allows developers to structure their application's state in a way that best suits their needs.
+- Performance Optimization: The library is built with performance in mind, employing efficient state tracking and update mechanisms to minimize unnecessary re-renders and improve application responsiveness.
+- `ezmodel` is designed to handle asynchronous operations seamlessly. It offers built-in support for managing async data fetching, processing, and state updates, making it easier for developers to work with asynchronous data sources such as APIs or databases without the need for extensive boilerplate code.
+- The library provides utilities for dispatching async actions, allowing for clean and concise handling of side effects. This feature simplifies the development process when dealing with operations like data fetching, parsing, and error handling in an asynchronous context.
+- `ezmodel` is fully compatible with React's Suspense and Error Boundary features. This integration allows developers to leverage the power of Suspense for data fetching, enabling more efficient rendering strategies and improving the user experience during data loading states.
+- The support for Error Boundaries ensures that `ezmodel` can gracefully handle errors within the component tree, providing fallback UIs in case of errors and enhancing the application's robustness.
+
+### Compare to other libraries
+
+#### ezmodel
+
+```js
+import { model, view } from "ezmodel/react";
+
+const app = model({
+  count: 0,
+  get doubledCount() {
+    return this.count * 2;
+  },
+});
+const App = view(() => (
+  <div onClick={() => app.count++}>{app.doubledCount}</div>
+));
+```
+
+#### Jotai
 
 ```js
 import { atom } from "jotai";
 
 const countAtom = atom(0);
+const doubledCountAtom = atom((get) => get(countAtom) * 2);
 
 const App = () => {
-  const [count, setCount] = useAtom(countAtom);
-  return <div onClick={() => setCount((prev) => prev + 1)}>{app.count}</div>;
+  const [, setCount] = useAtom(countAtom);
+  const [doubledCount] = useAtom(doubledCountAtom);
+
+  return <div onClick={() => setCount((prev) => prev + 1)}>{doubledCount}</div>;
 };
 ```
 
-### Compare to Zustand
+#### Zustand
 
 ```js
 import create from "zustand";
 
-export const useStore = create((set) => ({
+export const useStore = create((set, get) => ({
   count: 0,
+  // unlike ezmodel, this getter is not cached for subsequent access
+  get doubledCount() {
+    return get().count * 2;
+  },
   increment: () => set((state) => ({ count: state.count + 1 })),
 }));
 
 const App = () => {
-  const count = useStore((state) => state.count);
+  const doubledCount = useStore((state) => state.doubledCount);
   const increment = useStore((state) => state.increment);
-  return <div onClick={increment}>{count}</div>;
+  return <div onClick={increment}>{doubledCount}</div>;
 };
 ```
 
-### Compare to Redux Toolkit
+#### Redux Toolkit
 
 ```js
 import {
@@ -60,10 +98,17 @@ const store = configureStore({ reducer: {} });
 
 const counterSlice = createSlice({
   name: "counter",
-  initialState: { value: 0 },
+  initialState: { value: 0, doubledValue: 0 },
   reducers: {
     increment: (state) => {
       state.value += 1;
+      // Computation logic must be incorporated into all reducers that affect the value
+      state.doubledValue = state.value * 2;
+    },
+    decrement(state) {
+      state.value -= 1;
+      // Computation logic must be incorporated into all reducers that affect the value
+      state.doubledValue = state.value * 2;
     },
   },
 });
@@ -71,7 +116,7 @@ const counterSlice = createSlice({
 export const { increment } = counterSlice.actions;
 
 const App = () => {
-  const count = useSelector((state) => state.counter.value);
+  const count = useSelector((state) => state.counter.doubledValue);
   const dispatch = useDispatch();
   return <div onClick={() => dispatch(increment)}>{count}</div>;
 };
@@ -88,9 +133,12 @@ ReactDOM.render(
 
 - [`ezmodel`](#ezmodel)
   - [Introduction](#introduction)
-    - [Compare to Jotai](#compare-to-jotai)
-    - [Compare to Zustand](#compare-to-zustand)
-    - [Compare to Redux Toolkit](#compare-to-redux-toolkit)
+    - [Key Features](#key-features)
+    - [Compare to other libraries](#compare-to-other-libraries)
+      - [ezmodel](#ezmodel-1)
+      - [Jotai](#jotai)
+      - [Zustand](#zustand)
+      - [Redux Toolkit](#redux-toolkit)
   - [Table of contents](#table-of-contents)
   - [Installation](#installation)
     - [npm](#npm)
@@ -105,20 +153,23 @@ ReactDOM.render(
     - [Strict mode](#strict-mode)
     - [Adding side effects](#adding-side-effects)
     - [Handling async data](#handling-async-data)
-      - [Why shouldn't we use object spread operator?](#why-shouldnt-we-use-object-spread-operator)
     - [Handling action statuses](#handling-action-statuses)
     - [Model lifecycle](#model-lifecycle)
     - [Validating model properties](#validating-model-properties)
     - [Fine-grained reactivity](#fine-grained-reactivity)
     - [Persist models](#persist-models)
     - [Model is just vanilla JS](#model-is-just-vanilla-js)
-  - [How `ezmodel` work](#how-ezmodel-work)
+  - [Understanding reactivity in nested Objects](#understanding-reactivity-in-nested-objects)
+    - [Limitation with nested objects](#limitation-with-nested-objects)
+    - [Best practices for managing nested state](#best-practices-for-managing-nested-state)
   - [API References](#api-references)
-    - [model and model.strict](#model-and-modelstrict)
-    - [effect](#effect)
-    - [view](#view)
-    - [refresh](#refresh)
-    - [stale](#stale)
+    - [Namespaces](#namespaces)
+    - [model(props, options: ModelOptions): Model](#modelprops-options-modeloptions-model)
+    - [model.strict(props, options: ModelOptions): Model](#modelstrictprops-options-modeloptions-model)
+    - [effect(fn: Function): Function](#effectfn-function-function)
+    - [view(render: (props) =\> ReactNode): FunctionComponent](#viewrender-props--reactnode-functioncomponent)
+    - [refresh()](#refresh)
+    - [stale()](#stale)
 
 ## Installation
 
@@ -411,27 +462,6 @@ const TodoList = view(() => {
 
 > Note: All Promise objects stored within a model property or returned as a result of a model method are converted into an `AsyncResult` object. `AsyncResult` is a wrapper for promise objects, pre-equipped with the following properties: `loading`, `data`, and `error`. This makes controlling the state of a Promise more straightforward. When the properties of `AsyncResult` are accessed within view(), the view will track changes to the `AsyncResult` and re-render accordingly.
 
-#### Why shouldn't we use object spread operator?
-
-When you use the object spread operator, all properties with custom getters must be evaluated before copying, which can be inefficient and may lead to unintended side effects. In contrast, `ezmodel` uses `Object.getOwnPropertyDescriptors` to read all properties of one or more objects while skipping the execution of object getters.
-
-```js
-import { model } from "ezmodel";
-
-const machine = model({
-  get heavyComputation() {},
-});
-
-const human = model({
-  get fetchingLogic() {},
-});
-
-const cyborg = model({
-  ...machine, //heavyComputation invoked
-  ...human, // fetchingLogic invoked
-});
-```
-
 ### Handling action statuses
 
 Each model method is converted into an action object automatically. The action object has the following properties: `called`, `result`, `prevResult`, `error`, `loading`, `awaited` etc. Using these properties helps us understand the operational status of the action.
@@ -652,16 +682,133 @@ const createTodo = (props: { id: number; title: string }) => {
 };
 ```
 
-## How `ezmodel` work
+## Understanding reactivity in nested Objects
+
+In `ezmodel`, reactivity is the mechanism that automatically updates the UI or triggers effects when the state changes. However, this reactivity is only inherently applied to top-level properties of a model.
+
+### Limitation with nested objects
+
+When you have nested objects within your model, changes made directly to the properties of these nested objects do not automatically trigger reactivity. This is because ezmodel sets up reactivity proxies only at the top level by default.
+
+### Best practices for managing nested state
+
+**Flatten Your State Structure:** Where possible, avoid deeply nested structures. Flatter state structures are easier to manage, debug, and maintain reactivity. Consider redesigning your state shape if you find yourself frequently accessing deeply nested properties.
+
+**Use alter for Nested Updates:** When you need to update nested properties and maintain reactivity, use the alter function. alter allows you to perform mutations on multiple properties, and once the mutation function exits, ezmodel will batch update all models that have been changed, ensuring reactivity is preserved.
+
+```js
+import { model, alter } from "ezmodel/react";
+
+const person = model({ name: "Ging", company: { address: "abc" } });
+
+// Using `alter` to update a nested property
+alter(() => {
+  person.company.address = "new address"; // Reactivity is preserved
+});
+```
+
+`alter` is a function that takes a mutation function as an argument. Inside the mutation function, we can perform mutations on multiple properties of different models. Once exiting the mutation function, ezmodel will batch update all models that have been changed.
+
+```js
+import { model, alter } from "ezmodel/react";
+
+const person = model({ name: "Ging", company: { address: "abc" } });
+const product = model({ name: "Car", specs: { color: "white" } });
+
+alter(() => {
+  person.company.address = "new address";
+  product.specs.color = "red";
+});
+```
+
+**Clone and Re-Assign for Nested Updates:** Another approach to updating nested objects while triggering reactivity is to clone the nested object, modify it, and then re-assign it back to the parent object.
+
+```js
+const person = model({ name: "Ging", company: { address: "abc" } });
+
+// Cloning, modifying, and re-assigning to maintain reactivity
+person.company = { ...person.company, address: "new address" };
+```
+
+**Modeling Nested Structures:** For more complex scenarios, consider creating separate models for nested structures. This allows you to directly apply reactivity to nested objects.
+
+```js
+const company = model({ address: "abc" });
+const person = model({ name: "Ging", company });
+
+// Directly updating a nested model property
+person.company.address = "new address"; // Reactivity is preserved
+```
 
 ## API References
 
-### model and model.strict
+### Namespaces
 
-### effect
+- `ezmodel`: APIs for vanilla JS (`model`, `effect`, `alter` etc.)
+- `ezmodel/react`: APIs for React (`view`, `rx`), including all vanilla JS API
 
-### view
+### model(props, options: ModelOptions): Model
 
-### refresh
+Creates a model instance with the specified properties and options.
 
-### stale
+- **Parameters:**
+  - props: The properties to initialize the model with.
+  - options: Configuration options for the model creation.
+- **Returns:** An instance of Model.
+
+### model.strict(props, options: ModelOptions): Model
+
+Similar to model, but enforces all properties are readonly.
+
+- **Parameters**:
+  - props: The properties to initialize the model with.
+  - options: Configuration options for the model creation.
+- **Returns:** An instance of Model with strict behavior.
+
+### effect(fn: Function): Function
+
+Defines an effect function that is executed as a side effect.
+
+- **Parameters:**
+  - fn: The function to execute as an effect.
+- **Returns:** A function that can be called to remove the effect.
+
+### view(render: (props) => ReactNode): FunctionComponent
+
+Creates a React functional component using the provided render function.
+
+- **Parameters:**
+  - render: A function that returns ReactNode based on the given props.
+- **Returns:** A React FunctionComponent.
+
+### refresh()
+
+Forces a refresh/update of all properties for given model.
+
+- **Overloads:**
+
+  - refresh(model, prop): Refreshes a specific property of the model.
+  - refresh(model, props): Refreshes multiple properties of the model.
+  - refresh(models): Refreshes multiple models.
+
+- **Parameters:**
+  - model: The model to refresh.
+  - prop: A single property name to refresh.
+  - props: An array of property names to refresh.
+  - models: An array of models to refresh.
+
+### stale()
+
+Marks the given model or its properties as stale, indicating that they need to be re-evaluated or refreshed.
+
+- **Overloads:**
+
+  - stale(model, prop): Marks a specific property of the model as stale.
+  - stale(model, props): Marks multiple properties of the model as stale.
+  - stale(models): Marks multiple models as stale.
+
+- **Parameters:**
+  - model: The model to mark as stale.
+  - prop: A single property name to mark as stale.
+  - props: An array of property names to mark as stale.
+  - models: An array of models to mark as stale.
