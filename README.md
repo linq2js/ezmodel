@@ -148,6 +148,7 @@ ReactDOM.render(
     - [Creating reactive view](#creating-reactive-view)
     - [Creating local models](#creating-local-models)
   - [Advanced Usages](#advanced-usages)
+  - [Magic of view](#magic-of-view)
     - [Computed/derived model props](#computedderived-model-props)
       - [Pitfalls](#pitfalls)
     - [Strict mode](#strict-mode)
@@ -257,6 +258,66 @@ const App = view(() => {
 ```
 
 ## Advanced Usages
+
+## Magic of view
+
+The `view` in `ezmodel` is not only used for connecting the model to React components, but it also has the following features:
+
+- Automatically memoizes input props to optimize performance by caching the results of function calls and reusing the cache when the same inputs occur again.
+- Automatically tracks the props used during rendering and re-renders if those props change (from the parent component), ensuring the component updates in response to relevant data changes.
+
+```tsx
+import { view, model } from "ezmodel/react";
+
+const counter = model({ count: 0 });
+
+// this component has no prop access
+const Counter1 = view((props: { name: string }) => {
+  return <button>{counter.count}</button>;
+});
+
+// this component has prop access during rendering phase
+const Counter2 = view((props: { name: string }) => {
+  return (
+    <button>
+      {props.name} {counter.count}
+    </button>
+  );
+});
+
+// this component has prop access in a callback
+const Counter3 = view((props: { name: string }) => {
+  return <button onClick={() => alert(props.name)}>{counter.count}</button>;
+});
+
+const App = () => {
+  const [name, setName] = useState("");
+  const changeName = () => {
+    setName(Math.random().toString());
+  };
+
+  return (
+    <>
+      <button onClick={changeName}></button>
+      <Counter1 name={name} />
+      <Counter2 name={name} />
+      <Counter3 name={name} />
+    </>
+  );
+};
+```
+
+In this example, we have 3 components, each accessing props in a different way. During the first render, ezmodel detects that only Counter2 uses props.name during rendering, while the other two components do not access any props. If the user clicks on the button, the parent component passes a new value to the name prop. Only Counter2 will re-render because it accesses props.name. Although Counter3 does not re-render, when the user clicks on a button inside the component, it will still display the latest value of props.name.
+
+> This optimization reduces the number of re-renders, making the app run faster. In development mode, this feature might complicate debugging or hot reloading, so it's possible to disable this feature while in development mode to facilitate these processes.
+
+```js
+import { propsChangeOptimization } from "ezmodel/react";
+
+if (process.env.NODE_ENV !== "production") {
+  propsChangeOptimization(false);
+}
+```
 
 ### Computed/derived model props
 
