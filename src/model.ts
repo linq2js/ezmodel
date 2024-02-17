@@ -711,6 +711,16 @@ const createModel = <T extends StateBase>(
   onDispose.on(factoryDispose);
 
   if (isModel<T>(target)) {
+    const targetApi = getModelApi(target);
+
+    if (targetApi) {
+      return createModel(
+        targetApi.strict,
+        targetApi.constructor as any,
+        targetApi.options
+      );
+    }
+
     return target;
   }
 
@@ -960,29 +970,4 @@ export const getModelApi = (value: any) => {
 
 export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
-};
-
-export type FromFn = {
-  <T extends Model<any>>(model: T): T;
-  <const T extends readonly Model<any>[]>(models: T): T;
-};
-
-export const from: FromFn = (
-  input: Model<any> | readonly Model<any>[]
-): any => {
-  const isMultiple = Array.isArray(input);
-  const models = isMultiple ? input : [input];
-  const clones = models.map((m) => {
-    const api = getModelApi(m);
-    if (!api) {
-      throw new Error("The object is not model");
-    }
-    if (api.strict) {
-      return model.strict(api.constructor, api.options);
-    }
-
-    return model(api.constructor, api.options);
-  });
-
-  return isMultiple ? clones : clones[0];
 };

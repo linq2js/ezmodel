@@ -24,121 +24,19 @@ This ensures automatic updates to your views when necessary. The way you organiz
 - **Reactivity:** The library employs a reactive programming model, ensuring that changes in the application state are automatically and efficiently propagated throughout the UI. This reactivity is central to maintaining consistent and dynamic user interfaces.
 - **Flexible State Modeling:** `ezmodel` supports a wide range of state modeling scenarios, from simple local state management to complex global state scenarios. This flexibility allows developers to structure their application's state in a way that best suits their needs.
 - **Performance Optimization:** The library is built with performance in mind, employing efficient state tracking and update mechanisms to minimize unnecessary re-renders and improve application responsiveness.
-- `ezmodel` is designed to handle asynchronous operations seamlessly. It offers built-in support for managing async data fetching, processing, and state updates, making it easier for developers to work with asynchronous data sources such as APIs or databases without the need for extensive boilerplate code.
-- The library provides utilities for dispatching async actions, allowing for clean and concise handling of side effects. This feature simplifies the development process when dealing with operations like data fetching, parsing, and error handling in an asynchronous context.
-- `ezmodel` is fully compatible with React's Suspense and Error Boundary features. This integration allows developers to leverage the power of Suspense for data fetching, enabling more efficient rendering strategies and improving the user experience during data loading states.
-- The support for Error Boundaries ensures that `ezmodel` can gracefully handle errors within the component tree, providing fallback UIs in case of errors and enhancing the application's robustness.
-
-### Compare to other libraries
-
-#### ezmodel
-
-```js
-import { model, view } from "ezmodel/react";
-
-const app = model({
-  count: 0,
-  get doubledCount() {
-    return this.count * 2;
-  },
-});
-const App = view(() => (
-  <div onClick={() => app.count++}>{app.doubledCount}</div>
-));
-```
-
-#### Jotai
-
-```js
-import { atom } from "jotai";
-
-const countAtom = atom(0);
-const doubledCountAtom = atom((get) => get(countAtom) * 2);
-
-const App = () => {
-  const [, setCount] = useAtom(countAtom);
-  const [doubledCount] = useAtom(doubledCountAtom);
-
-  return <div onClick={() => setCount((prev) => prev + 1)}>{doubledCount}</div>;
-};
-```
-
-#### Zustand
-
-```js
-import create from "zustand";
-
-export const useStore = create((set, get) => ({
-  count: 0,
-  // unlike ezmodel, this getter is not cached for subsequent access
-  get doubledCount() {
-    return get().count * 2;
-  },
-  increment: () => set((state) => ({ count: state.count + 1 })),
-}));
-
-const App = () => {
-  const doubledCount = useStore((state) => state.doubledCount);
-  const increment = useStore((state) => state.increment);
-  return <div onClick={increment}>{doubledCount}</div>;
-};
-```
-
-#### Redux Toolkit
-
-```js
-import {
-  useSelector,
-  useDispatch,
-  createSlice,
-  configureStore,
-} from "@reduxjs/toolkit";
-
-const store = configureStore({ reducer: {} });
-
-const counterSlice = createSlice({
-  name: "counter",
-  initialState: { value: 0, doubledValue: 0 },
-  reducers: {
-    increment: (state) => {
-      state.value += 1;
-      // Computation logic must be incorporated into all reducers that affect the value
-      state.doubledValue = state.value * 2;
-    },
-    decrement(state) {
-      state.value -= 1;
-      // Computation logic must be incorporated into all reducers that affect the value
-      state.doubledValue = state.value * 2;
-    },
-  },
-});
-
-export const { increment } = counterSlice.actions;
-
-const App = () => {
-  const count = useSelector((state) => state.counter.doubledValue);
-  const dispatch = useDispatch();
-  return <div onClick={() => dispatch(increment)}>{count}</div>;
-};
-
-ReactDOM.render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  document.getElementById("root")
-);
-```
+- **Seamless async data handling:**
+  - `ezmodel` is designed to handle asynchronous operations seamlessly. It offers built-in support for managing async data fetching, processing, and state updates, making it easier for developers to work with asynchronous data sources such as APIs or databases without the need for extensive boilerplate code.
+  - The library provides utilities for dispatching async actions, allowing for clean and concise handling of side effects. This feature simplifies the development process when dealing with operations like data fetching, parsing, and error handling in an asynchronous context.
+- **Compatible with Suspense and ErrorBoundary:**
+  - `ezmodel` is fully compatible with React's Suspense and Error Boundary features. This integration allows developers to leverage the power of Suspense for data fetching, enabling more efficient rendering strategies and improving the user experience during data loading states.
+  - The support for Error Boundaries ensures that `ezmodel` can gracefully handle errors within the component tree, providing fallback UIs in case of errors and enhancing the application's robustness.
+- Fully supports TypeScript
 
 ## Table of contents
 
 - [`ezmodel`](#ezmodel)
   - [Introduction](#introduction)
     - [Key Features](#key-features)
-    - [Compare to other libraries](#compare-to-other-libraries)
-      - [ezmodel](#ezmodel-1)
-      - [Jotai](#jotai)
-      - [Zustand](#zustand)
-      - [Redux Toolkit](#redux-toolkit)
   - [Table of contents](#table-of-contents)
   - [Installation](#installation)
     - [npm](#npm)
@@ -163,6 +61,11 @@ ReactDOM.render(
   - [Understanding reactivity in nested Objects](#understanding-reactivity-in-nested-objects)
     - [Limitation with nested objects](#limitation-with-nested-objects)
     - [Best practices for managing nested state](#best-practices-for-managing-nested-state)
+  - [Compare to other libraries](#compare-to-other-libraries)
+    - [Ezmodel](#ezmodel-1)
+    - [Jotai](#jotai)
+    - [Zustand](#zustand)
+    - [Redux Toolkit](#redux-toolkit)
   - [API References](#api-references)
     - [Namespaces](#namespaces)
     - [model(props, options: ModelOptions): Model](#modelprops-options-modeloptions-model)
@@ -171,6 +74,8 @@ ReactDOM.render(
     - [view(render: (props) =\> ReactNode): FunctionComponent](#viewrender-props--reactnode-functioncomponent)
     - [refresh()](#refresh)
     - [stale()](#stale)
+  - [License](#license)
+  - [Community Support](#community-support)
 
 ## Installation
 
@@ -801,6 +706,106 @@ const person = model({ name: "Ging", company });
 person.company.address = "new address"; // Reactivity is preserved
 ```
 
+## Compare to other libraries
+
+### Ezmodel
+
+```js
+import { model, view } from "ezmodel/react";
+
+const app = model({
+  count: 0,
+  get doubledCount() {
+    return this.count * 2;
+  },
+});
+const App = view(() => (
+  <div onClick={() => app.count++}>{app.doubledCount}</div>
+));
+```
+
+### Jotai
+
+```js
+import { atom } from "jotai";
+
+const countAtom = atom(0);
+const doubledCountAtom = atom((get) => get(countAtom) * 2);
+
+const App = () => {
+  const [, setCount] = useAtom(countAtom);
+  const [doubledCount] = useAtom(doubledCountAtom);
+
+  return <div onClick={() => setCount((prev) => prev + 1)}>{doubledCount}</div>;
+};
+```
+
+### Zustand
+
+```js
+import create from "zustand";
+
+export const useStore = create((set, get) => ({
+  count: 0,
+  // unlike ezmodel, this getter is not cached for subsequent access
+  get doubledCount() {
+    return get().count * 2;
+  },
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}));
+
+const App = () => {
+  const doubledCount = useStore((state) => state.doubledCount);
+  const increment = useStore((state) => state.increment);
+  return <div onClick={increment}>{doubledCount}</div>;
+};
+```
+
+### Redux Toolkit
+
+```js
+import {
+  useSelector,
+  useDispatch,
+  createSlice,
+  configureStore,
+} from "@reduxjs/toolkit";
+
+const store = configureStore({ reducer: {} });
+
+const counterSlice = createSlice({
+  name: "counter",
+  initialState: { value: 0, doubledValue: 0 },
+  reducers: {
+    increment: (state) => {
+      state.value += 1;
+      // Computation logic must be incorporated into all reducers that affect the value
+      state.doubledValue = state.value * 2;
+    },
+    decrement(state) {
+      state.value -= 1;
+      // Computation logic must be incorporated into all reducers that affect the value
+      state.doubledValue = state.value * 2;
+    },
+  },
+});
+
+export const { increment } = counterSlice.actions;
+
+const App = () => {
+  const count = useSelector((state) => state.counter.doubledValue);
+  const dispatch = useDispatch();
+  return <div onClick={() => dispatch(increment)}>{count}</div>;
+};
+
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById("root")
+);
+```
+
 ## API References
 
 ### Namespaces
@@ -873,3 +878,17 @@ Marks the given model or its properties as stale, indicating that they need to b
   - prop: A single property name to mark as stale.
   - props: An array of property names to mark as stale.
   - models: An array of models to mark as stale.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/linq2js/ezmodel/blob/main/LICENSE) file for details.
+
+## Community Support
+
+For questions, discussions, or contributions, please join our community:
+
+- **GitHub Issues:** For reporting bugs or requesting new features, please use [GitHub Issues](https://github.com/linq2js/ezmodel/issues).
+- **Discussions:** Join the conversation and ask questions in [GitHub Discussions](https://github.com/linq2js/ezmodel/discussions).
+- **Contribute:** Contributions are welcome! If you're interested in contributing, please read our [CONTRIBUTING](https://github.com/linq2js/ezmodel/blob/main/CONTRIBUTING.md) guide for more information on how to get started.
+
+Stay connected and help improve `ezmodel` by sharing your feedback and ideas with the community!

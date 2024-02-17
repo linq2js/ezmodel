@@ -1,6 +1,6 @@
 import { alter } from "./alter";
 import { filter } from "./emitter";
-import { dispose, refresh, stale, model, from } from "./model";
+import { dispose, refresh, stale, model } from "./model";
 import { z } from "zod";
 
 describe("basic usages", () => {
@@ -397,27 +397,14 @@ describe("computed", () => {
   });
 });
 
-describe("from", () => {
+describe("copy", () => {
   test("clone one", () => {
     const parent = model({ count: 1 });
-    const child = from(parent);
+    const child = model(parent);
     expect(child.count).toBe(1);
     child.count++;
     // the change from child does not impact the parent
     expect(parent.count).toBe(1);
-  });
-
-  test("clone many", () => {
-    const parent1 = model({ count: 1 });
-    const parent2 = model({ name: "Ging" });
-    const [child1, child2] = from([parent1, parent2]);
-    expect(child1.count).toBe(1);
-    child1.count++;
-    child2.name = "new name";
-
-    // the change from children does not impact the parents
-    expect(parent1.count).toBe(1);
-    expect(parent2.name).toBe("Ging");
   });
 });
 
