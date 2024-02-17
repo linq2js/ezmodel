@@ -374,7 +374,7 @@ counter.count++; // no log
 `ezmodel` provides a `wait()` function for handling asynchronous data. `wait()` takes one or more Promise objects and will return the resolved data if the Promise is fulfilled, or throw an error if the Promise is rejected, and will throw the Promise object itself if it is still pending. The nearest `Suspense` and `ErrorBoundary` wrappers will catch the outcomes of `wait()` and proceed to render the corresponding fallback.
 
 ```jsx
-import { wait, model } from "ezmodel/react";
+import { wait, model, view } from "ezmodel/react";
 import { ErrorBoundary } from "react-error-boundary";
 
 const app = model({
@@ -387,7 +387,7 @@ const app = model({
 });
 
 const TodoList = view(() => {
-  // return array of todos, no async operator needed
+  // Return an array of todos without using the await operator, additional loading/error states, or useEffect.
   const todos = wait(app.todos);
 
   return (
