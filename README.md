@@ -20,10 +20,10 @@ This ensures automatic updates to your views when necessary. The way you organiz
 
 ### Key Features
 
-- Simplicity and Ease of Use: `ezmodel` aims to reduce the complexity often associated with state management in web applications. It offers a minimalistic API, making it accessible for developers of all skill levels.
-- Reactivity: The library employs a reactive programming model, ensuring that changes in the application state are automatically and efficiently propagated throughout the UI. This reactivity is central to maintaining consistent and dynamic user interfaces.
-- Flexible State Modeling: `ezmodel` supports a wide range of state modeling scenarios, from simple local state management to complex global state scenarios. This flexibility allows developers to structure their application's state in a way that best suits their needs.
-- Performance Optimization: The library is built with performance in mind, employing efficient state tracking and update mechanisms to minimize unnecessary re-renders and improve application responsiveness.
+- **Simplicity and Ease of Use:** `ezmodel` aims to reduce the complexity often associated with state management in web applications. It offers a minimalistic API, making it accessible for developers of all skill levels.
+- **Reactivity:** The library employs a reactive programming model, ensuring that changes in the application state are automatically and efficiently propagated throughout the UI. This reactivity is central to maintaining consistent and dynamic user interfaces.
+- **Flexible State Modeling:** `ezmodel` supports a wide range of state modeling scenarios, from simple local state management to complex global state scenarios. This flexibility allows developers to structure their application's state in a way that best suits their needs.
+- **Performance Optimization:** The library is built with performance in mind, employing efficient state tracking and update mechanisms to minimize unnecessary re-renders and improve application responsiveness.
 - `ezmodel` is designed to handle asynchronous operations seamlessly. It offers built-in support for managing async data fetching, processing, and state updates, making it easier for developers to work with asynchronous data sources such as APIs or databases without the need for extensive boilerplate code.
 - The library provides utilities for dispatching async actions, allowing for clean and concise handling of side effects. This feature simplifies the development process when dealing with operations like data fetching, parsing, and error handling in an asynchronous context.
 - `ezmodel` is fully compatible with React's Suspense and Error Boundary features. This integration allows developers to leverage the power of Suspense for data fetching, enabling more efficient rendering strategies and improving the user experience during data loading states.

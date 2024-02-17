@@ -420,3 +420,28 @@ describe("from", () => {
     expect(parent2.name).toBe("Ging");
   });
 });
+
+describe("class", () => {
+  test("class", () => {
+    class Animal {
+      get name() {
+        return "animal";
+      }
+
+      run() {
+        return true;
+      }
+    }
+
+    class Bird extends Animal {
+      get name() {
+        return "bird";
+      }
+    }
+
+    const bird = model(Bird);
+    expect(bird.run()).toBeTruthy();
+    expect(bird.name).toBe("bird");
+    expect(JSON.stringify(bird)).toBe('{"name":"bird"}');
+  });
+});

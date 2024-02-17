@@ -18,7 +18,7 @@ import {
   NO_WRAP,
   Dictionary,
 } from "./types";
-import { NOOP, isPromiseLike } from "./utils";
+import { NOOP, isClass, isPromiseLike } from "./utils";
 
 export type ModelOptions<T> = {
   tags?: Tag<T>[];
@@ -465,8 +465,22 @@ const createModelProxy = (
   setProp?: (prop: string | symbol, value: any) => boolean
 ) => {
   const target = {};
+  const toJSON = () => {
+    const result: Dictionary = {};
+    Object.keys(descriptors).forEach((key) => {
+      const value = getProp(key).get();
+      if (typeof value !== "function") {
+        result[key] = value;
+      }
+    });
+    return result;
+  };
+
   return new Proxy(target, {
     get(_, prop) {
+      if (prop === "toJSON") {
+        return toJSON;
+      }
       return getProp(prop).get();
     },
     set(_, p, value) {
@@ -504,7 +518,11 @@ const createModelProxy = (
 
 export type ReadonlyModel<T> = Model<Readonly<T>>;
 
-export type State<T> = T extends () => infer R ? R : T;
+export type State<T> = T extends () => infer R
+  ? R
+  : T extends new () => infer R
+  ? R
+  : T;
 
 /**
  * model(base, initFn, options)
@@ -528,11 +546,69 @@ export type ModelFn = {
   >;
 };
 
+const descriptorCache = new WeakMap<object, DescriptorMap>();
+const baseClassCache = new WeakMap<object, AnyFunc[]>();
+const getAllBaseClasses = (cls: any) => {
+  let bases = baseClassCache.get(cls);
+  if (!bases) {
+    bases = [];
+
+    let current = cls;
+
+    // Traverse the prototype chain
+    while (current) {
+      let base = Object.getPrototypeOf(current);
+      if (base && base !== Function.prototype && base.name) {
+        bases.unshift(base);
+      }
+      current = base;
+    }
+
+    baseClassCache.set(cls, bases);
+  }
+
+  return bases;
+};
+
+const getOwnPropertyDescriptors = (obj: any): DescriptorMap => {
+  if (isClass(obj)) {
+    let descriptors = descriptorCache.get(obj);
+    if (!descriptors) {
+      const classes = [...getAllBaseClasses(obj), obj as AnyFunc];
+      const { constructor: _, ...classDescriptors } = classes.reduce(
+        (prev: DescriptorMap, c) => {
+          return {
+            ...prev,
+            ...Object.getOwnPropertyDescriptors(c.prototype),
+          };
+        },
+        {}
+      );
+      descriptors = classDescriptors;
+      descriptorCache.set(obj, descriptors);
+    }
+
+    return descriptors;
+  }
+
+  return Object.getOwnPropertyDescriptors(obj);
+};
+
 const createFactory =
   (strict: boolean) =>
   (init: Dictionary | AnyFunc, options?: ModelOptions<any>) => {
     const constructor =
-      typeof init === "function" ? (init as AnyFunc) : () => init;
+      typeof init === "function"
+        ? isClass(init)
+          ? () => {
+              const instance = new (init as any)();
+              return [instance, getOwnPropertyDescriptors(init)] as const;
+            }
+          : () => {
+              const instance = init();
+              return [instance, getOwnPropertyDescriptors(instance)] as const;
+            }
+        : () => [init, getOwnPropertyDescriptors(init)] as const;
 
     // handle local model creation
     const localModel = local()?.get("model", () => {
@@ -564,7 +640,7 @@ type DescriptorMap = Record<string, PropertyDescriptor>;
 
 const createModel = <T extends StateBase>(
   strict: boolean,
-  constructor: () => T,
+  constructor: () => readonly [T, DescriptorMap],
   options: ModelOptions<any> = {}
 ): Model<T> => {
   const { tags, rules, save, load } = options;
@@ -574,7 +650,6 @@ const createModel = <T extends StateBase>(
   let persistedValues: Record<string, any>;
   let descriptorsReady = false;
   const propInfoMap = new Map<string, PropInfo>();
-  const descriptors: DescriptorMap = {};
   const onDispose = emitter();
 
   const getProp: PropGetter = (prop) => {
@@ -628,15 +703,16 @@ const createModel = <T extends StateBase>(
     return false;
   };
 
+  const [{ dispose: factoryDispose }, [target, descriptors]] =
+    disposable(constructor);
+
   privateProxy = createModelProxy(descriptors, getProp, setProp);
-  const [{ dispose: factoryDispose }, target] = disposable(constructor);
+
   onDispose.on(factoryDispose);
 
   if (isModel<T>(target)) {
     return target;
   }
-
-  Object.assign(descriptors, Object.getOwnPropertyDescriptors(target));
 
   const init =
     typeof descriptors.init?.value === "function"
