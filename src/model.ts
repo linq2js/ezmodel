@@ -2,6 +2,22 @@ import { getValue, setValue } from "./alter";
 import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
+import { getModelApi } from "./getModelApi";
+import {
+  DescriptorMap,
+  PropGetter,
+  StateProp,
+  Validator,
+  MODEL_TYPE,
+  NO_WRAP,
+  StateBase,
+  ActionProp,
+  ModelOptions,
+  Prop,
+  PropSetter,
+  UnknownProp,
+  ModelApi,
+} from "./internal";
 import { local } from "./local";
 import { scope } from "./scope";
 import { trackable } from "./trackable";
@@ -10,123 +26,11 @@ import {
   AsyncResult,
   Listenable,
   NoInfer,
-  Rule,
-  StateBase,
-  Tag,
   NonFunctionProps,
   Model,
-  MODEL_TYPE,
-  NO_WRAP,
   Dictionary,
 } from "./types";
 import { NOOP, isClass, isPromiseLike } from "./utils";
-
-export type ModelOptions<T> = {
-  tags?: Tag<T>[];
-
-  /**
-   * LOCAL MODEL ONLY: the model will update specified props according to new input props
-   * ```js
-   * // WITHOUT UNSTABLE OPTION
-   * const counter = model({ count: props.initCount })
-   * console.log(counter.count)
-   *
-   * // initial rendering:
-   * props.initCount = 1
-   * counter.count = 1
-   *
-   * // changing counter.count to 2
-   * props.initCount = 1
-   * counter.count = 2
-   *
-   * // re-render with new props { initCount: 3 }
-   * props.initCount = 3
-   * counter.count = 2 // the count value is not the same as initCount
-   *
-   * // WITH UNSTABLE OPTION
-   * const counter = model({ count: props.initCount }, { unstable: { count: true } })
-   * console.log(counter.count)
-   *
-   * // initial rendering:
-   * props.initCount = 1
-   * counter.count = 1
-   *
-   * // changing counter.count to 2
-   * props.initCount = 1
-   * counter.count = 2
-   *
-   * // re-render with new props { initCount: 3 }
-   * props.initCount = 3
-   * counter.count = 3 // the count value is the same as initCount
-   * ```
-   */
-  unstable?: {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?:
-      | boolean
-      | 1
-      | 0
-      | undefined;
-  };
-
-  rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
-
-  /**
-   * This method will be invoked to load model persisted data until the first property access of the model occurs.
-   * @returns
-   */
-  load?: () => {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?: T[key];
-  };
-
-  /**
-   * This method will be called to save model data to persistent storage whenever model properties have been changed.
-   * @param model
-   * @returns
-   */
-  save?: (model: T) => void;
-};
-
-type PropBase = {
-  get(): any;
-};
-
-type UpdatableProp = PropBase & {
-  on: Listenable["on"];
-  dispose: VoidFunction;
-};
-
-type StateProp = UpdatableProp & {
-  type: "state";
-  stale(notify?: boolean): void;
-  refresh(): void;
-  hasError(): boolean;
-  set(value: any): void;
-};
-
-type ActionProp = UpdatableProp & {
-  type: "action";
-  setDispatcher(dispatcher: AnyFunc): void;
-};
-type UnknownProp = PropBase & { type: "unknown" };
-
-type Prop = StateProp | ActionProp | UnknownProp;
-
-type PropGetter = (prop: string | symbol) => Prop;
-type PropSetter = (prop: string | symbol, value: any) => boolean;
-
-type Validator = (value: any, transform?: (value: any) => void) => void;
-
-type ModelApi = {
-  strict: boolean;
-  dispose: AnyFunc;
-  stale: AnyFunc;
-  refresh: AnyFunc;
-  constructor: () => StateBase;
-  descriptors: DescriptorMap;
-  rules: Dictionary<Validator | undefined>;
-  configure(props: Dictionary, unstable?: Dictionary): void;
-  options: ModelOptions<any>;
-};
 
 const createStateProp = <T>(
   descriptors: DescriptorMap,
@@ -698,8 +602,6 @@ export const model: ModelFn = Object.assign(createFactory(false), {
   strict: createFactory(true),
 });
 
-type DescriptorMap = Record<string, PropertyDescriptor>;
-
 const createModel = <T extends StateBase>(
   strict: boolean,
   constructor: () => readonly [T, DescriptorMap],
@@ -1024,10 +926,6 @@ export const refresh: RefreshFn = (input: any, ...args: any[]) => {
       track?.(listenable);
     }
   });
-};
-
-export const getModelApi = (value: any) => {
-  return value?.[MODEL_TYPE] as ModelApi | undefined;
 };
 
 export const isModel = <T>(value: unknown): value is Model<T> => {

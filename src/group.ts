@@ -1,6 +1,7 @@
 import { disposable } from "./disposable";
+import { NO_WRAP } from "./internal";
 import { objectKeyedMap } from "./objectKeyedMap";
-import { AnyFunc, Group, NO_WRAP, NoInfer } from "./types";
+import { AnyFunc, Group, NoInfer } from "./types";
 
 export type GroupFn = {
   <TKey, TValue, TResult>(

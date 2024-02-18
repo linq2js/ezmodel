@@ -1,3 +1,5 @@
+import { MODEL_TYPE, StateBase } from "./internal";
+
 export type AnyFunc = (...args: any[]) => any;
 
 export type NoInfer<T> = [T][T extends any ? 0 : never];
@@ -102,8 +104,6 @@ export type Rule<T> =
   // sugar syntactic for other validation lib (ex: yup)
   | { validate(value: T): void };
 
-export type StateBase = Dictionary;
-
 export type Tag<T = any> = {
   readonly type: "tag";
   readonly count: number;
@@ -129,10 +129,6 @@ export type PublicProps<T> = Omit<
 export type NonFunctionProps<T> = {
   [key in keyof T as T[key] extends AnyFunc ? never : key]: T[key];
 };
-
-export const MODEL_TYPE = Symbol("ezmodel.model");
-
-export const NO_WRAP = Symbol("ezmodel.noWrap");
 
 export type Model<T> = T extends StateBase
   ? PublicProps<T> & {
