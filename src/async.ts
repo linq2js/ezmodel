@@ -412,6 +412,10 @@ const asyncResultProps = <T = any>(
   let error = initialError;
   let data = initialData;
 
+  if (typeof (promise as any).cancel !== "function") {
+    (promise as any).cancel = NOOP;
+  }
+
   const ar = Object.assign(promise, {
     [ASYNC_RESULT_PROP]: true,
     on(listener: AnyFunc) {

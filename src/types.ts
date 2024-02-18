@@ -34,7 +34,9 @@ export type Loadable<T> =
   | { loading: false; error: any; data: undefined }
   | { loading: true; data: undefined; error: undefined };
 
-export type AsyncResult<T = any> = Promise<T> & Loadable<T> & Listenable<void>;
+export type AsyncResult<T = any> = Promise<T> &
+  Loadable<T> &
+  Listenable<void> & { cancel(): void };
 
 export type ImmutableType =
   | string

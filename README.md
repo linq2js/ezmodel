@@ -169,7 +169,7 @@ const App = view(() => {
 
 ### You might not need useState, useRef, useMemo, useCallback
 
-We can use a local model as a replacement for employing useState, useRef, useMemo, and useCallback.
+A local model can serve as an alternative to using useState, useRef, useMemo, and useCallback, eliminating concerns regarding hook dependencies.
 
 #### Alternative of useState()
 
