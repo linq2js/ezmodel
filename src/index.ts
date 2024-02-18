@@ -6,4 +6,5 @@ export * from "./group";
 export * from "./scope";
 export * from "./trackable";
 export * from "./disposable";
+export * from "./cancellable";
 export * from "./emitter";

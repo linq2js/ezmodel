@@ -1,18 +1,18 @@
-import { emitter } from './emitter';
-import { scope } from './scope';
-import { Listenable, Listener } from './types';
-import { NOOP } from './utils';
+import { emitter } from "./emitter";
+import { scope } from "./scope";
+import { Listenable, Listener } from "./types";
+import { NOOP } from "./utils";
 
 export type Cancellable = Listenable<any> & {
-  cancelled: () => boolean;
+  readonly cancelled: boolean;
   cancel: (reason?: any) => void;
-  reason: () => any;
-  signal: () => AbortSignal | undefined;
-  error: () => Error | undefined;
+  readonly reason: any;
+  readonly signal: AbortSignal | undefined;
+  readonly error: Error | undefined;
   throwIfCancelled: () => void;
 };
 
-const CANCELLED_ERROR_PROP = Symbol('CancelledError');
+const CANCELLED_ERROR_PROP = Symbol("ezmodel.cancelledError");
 
 const create = (...listenables: Listenable<any>[]) => {
   let ac: AbortController | undefined;
@@ -32,7 +32,7 @@ const create = (...listenables: Listenable<any>[]) => {
     onDispose.clear();
   };
 
-  const cancel = (reason: any = 'Cancelled without reason') => {
+  const cancel = (reason: any = "Cancelled without reason") => {
     if (cancelled) {
       return;
     }
@@ -53,26 +53,28 @@ const create = (...listenables: Listenable<any>[]) => {
     return error;
   };
 
-  listenables.forEach(x => {
+  listenables.forEach((x) => {
     onDispose.on(x.on(cancel));
   });
 
   const instance: Cancellable = {
-    cancelled() {
+    get cancelled() {
       return Boolean(cancelled);
     },
-    error: getError,
-    reason() {
+    get error() {
+      return getError();
+    },
+    get reason() {
       return cancelled?.reason;
     },
-    signal() {
-      if (!ac) {
+    get signal() {
+      if (!ac && typeof AbortController !== "undefined") {
         ac = new AbortController();
         if (cancelled) {
           ac.abort(cancelled.reason);
         }
       }
-      return ac.signal;
+      return ac?.signal;
     },
     cancel,
     on(listener: Listener<any>) {
@@ -103,7 +105,7 @@ export const cancellable = Object.assign(scope(create), {
   },
   timeout(ms: number) {
     const ac = create();
-    setTimeout(ac.cancel, ms, 'Timeout');
+    setTimeout(ac.cancel, ms, "Timeout");
     return ac;
   },
   isCancelledError(value: any): value is Error {

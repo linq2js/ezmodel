@@ -554,7 +554,8 @@ export const delay = (ms = 0) => {
     new Promise<void>((resolve, reject) => {
       timeoutId = setTimeout(
         () => {
-          const e = cc?.error();
+          const e = cc?.error;
+
           if (e) {
             reject(e);
           } else {
