@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnyFunc } from "../types";
+import { AnyFunc, Dictionary } from "../types";
 import { NOOP } from "../utils";
 
 let propsChangeOptimizationEnabled = true;
@@ -51,7 +51,7 @@ export const propsChangeOptimization: PropsChangeOptimizationAccessor = (
   return undefined;
 };
 
-export const stable = <P extends Record<string, any>>(
+export const stable = <P extends Dictionary>(
   render: (props: P) => ReactElement
 ) => {
   type ContainerInfo = {

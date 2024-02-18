@@ -89,7 +89,7 @@ export type Base<T> = T extends readonly [infer TFirst, ...infer TRest]
     : TRest extends readonly [infer TLast] // last item
     ? Inherit<TFirst, TLast>
     : Inherit<TFirst, Base<TRest>>
-  : T extends Record<string, any>
+  : T extends Dictionary
   ? T
   : never;
 
@@ -100,7 +100,7 @@ export type Rule<T> =
   // sugar syntactic for other validation lib (ex: yup)
   | { validate(value: T): void };
 
-export type StateBase = Record<string, any>;
+export type StateBase = Dictionary;
 
 export type Tag<T = any> = {
   readonly type: "tag";

@@ -300,7 +300,7 @@ export const scope: ScopeFn = (...args: any[]): any => {
 
   // OVERLOAD: scope(defs, fn)
   const [scopeTypes, fn, modifier] = args as [
-    Record<string, ScopeDef<any>>,
+    Dictionary<ScopeDef<any>>,
     AnyFunc,
     AnyFunc | undefined
   ];

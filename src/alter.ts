@@ -1,7 +1,7 @@
 import { createDraft, finishDraft, produce } from "immer";
 
 import { isPromiseLike } from "./utils";
-import { AnyFunc, NoInfer } from "./types";
+import { AnyFunc, Dictionary, NoInfer } from "./types";
 import { async } from "./async";
 
 export type AlterFn = {
@@ -36,7 +36,7 @@ export const alter: AlterFn = (...args: any[]) => {
 
   if (args.length == 2) {
     const [model, props] = args;
-    Object.entries(props as Record<string, any>).forEach(([prop, value]) => {
+    Object.entries(props as Dictionary).forEach(([prop, value]) => {
       if (typeof value === "function") {
         const reducer = value;
         const prevValue = model[prop];

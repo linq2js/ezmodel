@@ -47,9 +47,9 @@ This ensures automatic updates to your views when necessary. The way you organiz
     - [Creating local models](#creating-local-models)
     - [You might not need useState, useRef, useMemo, useCallback](#you-might-not-need-usestate-useref-usememo-usecallback)
       - [Alternative of useState()](#alternative-of-usestate)
-      - [Alternative of useRef()](#alternative-of-useref)
-      - [Alternative of useCallback()](#alternative-of-usecallback)
-      - [Alternative of useMemo](#alternative-of-usememo)
+      - [Alternative of `useRef`](#alternative-of-useref)
+      - [Alternative of `useCallback`](#alternative-of-usecallback)
+      - [Alternative of `useMemo`](#alternative-of-usememo)
   - [Advanced Usages](#advanced-usages)
     - [Magic of view](#magic-of-view)
     - [Computed/derived model props](#computedderived-model-props)
@@ -182,7 +182,7 @@ const local = model({ count: 1 });
 return <button onClick={() => local.count++}>{count}</button>;
 ```
 
-#### Alternative of useRef()
+#### Alternative of `useRef`
 
 ```ts
 const intervalIdRef = useRef<any>();
@@ -198,7 +198,7 @@ const handleStart = () => {
 };
 ```
 
-#### Alternative of useCallback()
+#### Alternative of `useCallback`
 
 ```tsx
 const ProductPage = (props) => {
@@ -236,7 +236,7 @@ const ProductPage = view((props) => {
 });
 ```
 
-#### Alternative of useMemo
+#### Alternative of `useMemo`
 
 ```js
 const [state, setState] = sueState("");

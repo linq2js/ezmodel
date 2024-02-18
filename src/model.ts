@@ -61,7 +61,11 @@ export type ModelOptions<T> = {
    * ```
    */
   unstable?: {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?: boolean | 1 | 0;
+    [key in keyof T as T[key] extends AnyFunc ? never : key]?:
+      | boolean
+      | 1
+      | 0
+      | undefined;
   };
 
   rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
@@ -518,7 +522,7 @@ const createActionProp = <T, A extends any[]>(
 };
 
 const createModelProxy = (
-  descriptors: Record<string, PropertyDescriptor>,
+  descriptors: DescriptorMap,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
 ) => {
@@ -705,7 +709,7 @@ const createModel = <T extends StateBase>(
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
-  let persistedValues: Record<string, any>;
+  let persistedValues: Dictionary;
   let descriptorsReady = false;
   const propInfoMap = new Map<string, Prop>();
   const onDispose = emitter();
