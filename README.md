@@ -45,6 +45,11 @@ This ensures automatic updates to your views when necessary. The way you organiz
     - [Creating a global models](#creating-a-global-models)
     - [Creating reactive view](#creating-reactive-view)
     - [Creating local models](#creating-local-models)
+    - [You might not need useState, useRef, useMemo, useCallback](#you-might-not-need-usestate-useref-usememo-usecallback)
+      - [Alternative of useState()](#alternative-of-usestate)
+    - [Alternative of useRef()](#alternative-of-useref)
+    - [Alternative of useCallback()](#alternative-of-usecallback)
+      - [Alternative of useMemo](#alternative-of-usememo)
   - [Advanced Usages](#advanced-usages)
     - [Magic of view](#magic-of-view)
     - [Computed/derived model props](#computedderived-model-props)
@@ -161,6 +166,100 @@ const App = view(() => {
   return <button onClick={() => counter.count++}>{counter.count}</button>;
 });
 ```
+
+### You might not need useState, useRef, useMemo, useCallback
+
+We can use a local model as a replacement for employing useState, useRef, useMemo, and useCallback.
+
+#### Alternative of useState()
+
+```js
+const [count, setCount] = useState(0);
+return <button onClick={() => setCount(count + 1)}>{count}</button>;
+
+// EQUIVALENT TO
+const local = model({ count: 1 });
+return <button onClick={() => local.count++}>{count}</button>;
+```
+
+### Alternative of useRef()
+
+```ts
+const intervalIdRef = useRef<any>();
+const handleStart = () => {
+  intervalIdRef.current = setInterval(() => {});
+};
+
+// EQUIVALENT TO
+const local = model({ intervalId: undefined as any });
+// if the model prop has no access in rendering phase, it is similar to useEef value
+const handleStart = () => {
+  local.intervalId = setInterval(() => {});
+};
+```
+
+### Alternative of useCallback()
+
+```tsx
+const ProductPage = (props) => {
+  // value comes from another hook
+  const productRoute = useProductRoute();
+  const handleSubmit = useCallback(
+    (orderDetails) => {
+      post(productRoute + props.productId + "/buy", {
+        referrer: props.referrer,
+        orderDetails,
+      });
+    },
+    [productRoute, props.productId, props.referrer]
+  );
+};
+
+// EQUIVALENT TO
+const ProductPage = view((props) => {
+  // value comes from another hook
+  const productRoute = useProductRoute();
+  const local = model(
+    {
+      productRoute,
+      submit(orderDetails) {
+        // props is stable
+        post(this.productRoute + props.productId + "/buy", {
+          referrer: props.referrer,
+          orderDetails,
+        });
+      },
+    },
+    // Ensure that the productRoute stays updated during component re-rendering
+    { unstable: { productRoute: true } }
+  );
+});
+```
+
+#### Alternative of useMemo
+
+```js
+const [state, setState] = sueState("");
+const resultOfOtherHook = useOtherHook();
+const computedValue = useMemo(() => {
+  return state + resultOfOtherHook + props.value;
+}, [state, props.value, resultOfOtherHook]);
+
+// EQUIVALENT TO
+const local = model(
+  {
+    state: "",
+    propValue: props.value,
+    resultOfOtherHook,
+    get computedValue() {
+      return state + this.resultOfOtherHook + this.propValue;
+    },
+  },
+  { unstable: { resultOfOtherHook: true, propValue: true } }
+);
+```
+
+The key difference is that `model.computedValue` is not evaluated immediately upon access, whereas useMemo performs computation right away, which could affect rendering performance.
 
 ## Advanced Usages
 
