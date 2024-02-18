@@ -3,6 +3,7 @@ import { async } from "./async";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
 import { local } from "./local";
+import { scope } from "./scope";
 import { trackable } from "./trackable";
 import {
   AnyFunc,
@@ -60,7 +61,7 @@ export type ModelOptions<T> = {
    * ```
    */
   unstable?: {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?: boolean;
+    [key in keyof T as T[key] extends AnyFunc ? never : key]?: boolean | 1 | 0;
   };
 
   rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
@@ -81,16 +82,16 @@ export type ModelOptions<T> = {
   save?: (model: T) => void;
 };
 
-type PropInfoBase = {
+type PropBase = {
   get(): any;
 };
 
-type UpdatablePropInfo = PropInfoBase & {
+type UpdatableProp = PropBase & {
   on: Listenable["on"];
   dispose: VoidFunction;
 };
 
-type StatePropInfo = UpdatablePropInfo & {
+type StateProp = UpdatableProp & {
   type: "state";
   stale(notify?: boolean): void;
   refresh(): void;
@@ -98,15 +99,15 @@ type StatePropInfo = UpdatablePropInfo & {
   set(value: any): void;
 };
 
-type ActionPropInfo = UpdatablePropInfo & {
+type ActionProp = UpdatableProp & {
   type: "action";
   setDispatcher(dispatcher: AnyFunc): void;
 };
-type UnknownPropInfo = PropInfoBase & { type: "unknown" };
+type UnknownProp = PropBase & { type: "unknown" };
 
-type PropInfo = StatePropInfo | ActionPropInfo | UnknownPropInfo;
+type Prop = StateProp | ActionProp | UnknownProp;
 
-type PropGetter = (prop: string | symbol) => PropInfo;
+type PropGetter = (prop: string | symbol) => Prop;
 type PropSetter = (prop: string | symbol, value: any) => boolean;
 
 type Validator = (value: any, transform?: (value: any) => void) => void;
@@ -131,20 +132,24 @@ const createStateProp = <T>(
   validate?: Validator,
   customSet?: (value: T) => void,
   save?: VoidFunction
-): StatePropInfo => {
-  let prev: { value: T } | { error: any } | undefined;
+): StateProp => {
+  type EvaluateResult = { value: T } | { error: any };
+  let current: EvaluateResult | undefined;
+  let previous: EvaluateResult | undefined;
+  let original: EvaluateResult | undefined;
   let thisObject: any;
   let isComputing = false;
   let isTracking = false;
   const onCleanup = emitter();
   const onChange = emitter();
-  const dependencies = new Set<StatePropInfo>();
+  const dependencies = new Set<StateProp>();
   const onDependencyChange = () => {
-    prev = undefined;
+    previous = current;
+    current = undefined;
     onChange.emit();
   };
 
-  const addDependency = (info: StatePropInfo) => {
+  const addDependency = (info: StateProp) => {
     if (!dependencies.has(info)) {
       dependencies.add(info);
       onCleanup.on(info.on(onDependencyChange));
@@ -176,20 +181,21 @@ const createStateProp = <T>(
 
       try {
         isTracking = true;
-        const [{ onTrack }, result] = trackable(() => ({
-          value: getState.call(thisObject),
-        }));
-        prev = result;
+        const [{ onTrack }, result] = trackable(() => {
+          const value = propAccessor.none(() => getState.call(thisObject));
+          return { value };
+        });
+        current = result;
         onTrack((x) => {
           if ("$state" in x) {
-            addDependency(x.$state as StatePropInfo);
+            addDependency(x.$state as StateProp);
           } else {
             // normal listenable
             onCleanup.on(x.on(onDependencyChange));
           }
         });
       } catch (error) {
-        prev = { error };
+        current = { error };
       } finally {
         isTracking = false;
       }
@@ -199,32 +205,73 @@ const createStateProp = <T>(
   };
 
   const ensureValueReady = () => {
-    if (prev) return;
+    if (current) return current;
+
     if (computed) {
       recompute();
+      if (!current) {
+        throw new Error("Something went wrong");
+      }
     } else {
       try {
-        prev = { value: getState() };
+        current = { value: getState() };
       } catch (error) {
-        prev = { error };
+        current = { error };
       }
     }
 
-    if (prev && "value" in prev && isPromiseLike(prev.value)) {
-      prev.value = async(prev.value) as any;
+    if (current && "value" in current) {
+      if (isPromiseLike(current.value)) {
+        current.value = async(current.value) as any;
+      }
     }
+
+    if (!original) {
+      original = current;
+      previous = original;
+    }
+
+    return current;
+  };
+
+  const valueOrError = (result: EvaluateResult) => {
+    if ("error" in result) {
+      throw result.error;
+    }
+    return result.value;
   };
 
   const get = () => {
-    ensureValueReady();
-    if (prev && "error" in prev) {
-      throw prev.error;
+    const accessor = propAccessor();
+    current = ensureValueReady();
+
+    if (accessor) {
+      if (isComputing && accessor.type !== "peek") {
+        return valueOrError(current);
+      }
+
+      if (!original) {
+        original = current;
+      }
+
+      if (accessor.type === "original") {
+        return valueOrError(original);
+      }
+
+      if (accessor.type === "previous") {
+        if (!previous) {
+          previous = original;
+        }
+
+        return valueOrError(previous);
+      }
     }
-    return prev?.value as T;
+
+    return valueOrError(current);
   };
 
   const set = (value: T) => {
-    if (prev && "value" in prev && prev.value === value) {
+    if (current && "value" in current && current.value === value) {
       return;
     }
 
@@ -265,29 +312,40 @@ const createStateProp = <T>(
 
     // verify data duplication again
     if (transformed) {
-      if (prev && "value" in prev && prev.value === value) {
+      if (current && "value" in current && current.value === value) {
         return;
       }
     }
+    if (current) {
+      previous = current;
+    }
 
-    prev = { value };
+    current = { value };
 
     onChange.emit();
 
     customSet?.(value);
   };
 
-  const propInfo: StatePropInfo = {
+  const propInfo: StateProp = {
     type: "state",
     get() {
-      return getValue(set, get(), () => trackable()?.add(onChange));
+      return getValue(set, get(), () => {
+        // no tracking needed
+        if (propAccessor()?.type === "peek") {
+          return;
+        }
+
+        return trackable()?.add(onChange);
+      });
     },
     set(value: T) {
       return setValue(set, value);
     },
     stale(notify?: boolean) {
-      if (!prev) return;
-      prev = undefined;
+      if (!current) return;
+      previous = current;
+      current = undefined;
       dependencies.forEach((dependency) => {
         if (dependency.hasError()) {
           dependency.stale(notify);
@@ -305,7 +363,7 @@ const createStateProp = <T>(
     },
     on: onChange.on,
     hasError() {
-      return !!prev && "error" in prev;
+      return !!current && "error" in current;
     },
     dispose() {
       onCleanup.emit();
@@ -325,7 +383,7 @@ const createStateProp = <T>(
 const createActionProp = <T, A extends any[]>(
   dispatch: (...args: A) => T,
   proxy: T
-): ActionPropInfo => {
+): ActionProp => {
   let prevResult: T | undefined;
   let current:
     | {
@@ -649,7 +707,7 @@ const createModel = <T extends StateBase>(
   let proxy: any;
   let persistedValues: Record<string, any>;
   let descriptorsReady = false;
-  const propInfoMap = new Map<string, PropInfo>();
+  const propInfoMap = new Map<string, Prop>();
   const onDispose = emitter();
 
   const getProp: PropGetter = (prop) => {
@@ -823,7 +881,7 @@ const createModel = <T extends StateBase>(
     });
   };
 
-  const undefinedProp: UnknownPropInfo = { type: "unknown", get: NOOP };
+  const undefinedProp: UnknownProp = { type: "unknown", get: NOOP };
   const api: ModelApi = {
     refresh,
     stale,
@@ -835,7 +893,7 @@ const createModel = <T extends StateBase>(
     strict,
     options,
   };
-  const apiProp: UnknownPropInfo = {
+  const apiProp: UnknownProp = {
     type: "unknown",
     get: () => api,
   };
@@ -970,4 +1028,23 @@ export const getModelApi = (value: any) => {
 
 export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
+};
+
+const propAccessor = scope(() => ({
+  type: "previous" as "previous" | "original" | "peek",
+}));
+
+export const previous = <T>(fn: () => T): T => {
+  const [, result] = propAccessor(fn, (x) => (x.type = "previous"));
+  return result;
+};
+
+export const original = <T>(fn: () => T): T => {
+  const [, result] = propAccessor(fn, (x) => (x.type = "original"));
+  return result;
+};
+
+export const peek = <T>(fn: () => T): T => {
+  const [, result] = propAccessor(fn, (x) => (x.type = "peek"));
+  return result;
 };

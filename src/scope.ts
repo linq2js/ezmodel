@@ -2,6 +2,7 @@ import { isPromiseLike } from "./utils";
 import { AnyFunc, Dictionary } from "./types";
 
 export type ScopeEvents = "onExit" | "onEnter";
+const NO_SCOPE = {};
 
 export type ScopeDef<T> = {
   readonly type: "scope";
@@ -26,6 +27,8 @@ export type ScopeDef<T> = {
    * @returns
    */
   new: () => Omit<T, ScopeEvents>;
+
+  none<R>(fn: () => R): R;
 };
 
 export type ScopeSnapshot = {
@@ -66,7 +69,7 @@ export type CreateScopeDef = <T extends Dictionary>(
   create: () => T
 ) => ScopeDef<T>;
 
-export type Scope = {
+export type ScopeFn = {
   /**
    * get current snapshot
    */
@@ -127,7 +130,13 @@ const createScope = (create: AnyFunc) => {
     ];
   };
 
-  return Object.assign(accessor, { type: "scope", new: create }) as any;
+  return Object.assign(accessor, {
+    type: "scope",
+    new: create,
+    none(fn: AnyFunc) {
+      return accessor(fn, NO_SCOPE)[1];
+    },
+  }) as any;
 };
 
 const snapshotOf = new WeakMap<any, ScopeSnapshot>();
@@ -227,6 +236,9 @@ const createSnapshot = (stack: WeakMap<ScopeDef<any>, any>[] = []) => {
     for (const item of stack) {
       const value = item.get(def);
       if (value) {
+        if (value === NO_SCOPE) {
+          return undefined;
+        }
         return value;
       }
     }
@@ -264,7 +276,7 @@ const createSnapshot = (stack: WeakMap<ScopeDef<any>, any>[] = []) => {
   return snapshot;
 };
 
-export const scope: Scope = (...args: any[]): any => {
+export const scope: ScopeFn = (...args: any[]): any => {
   // OVERLOAD: scope()
   if (!args.length) {
     return currentSnapshot;

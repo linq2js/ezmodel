@@ -1,6 +1,14 @@
 import { alter } from "./alter";
 import { filter } from "./emitter";
-import { dispose, refresh, stale, model } from "./model";
+import {
+  dispose,
+  refresh,
+  stale,
+  model,
+  previous,
+  original,
+  peek,
+} from "./model";
 import { z } from "zod";
 
 describe("basic usages", () => {
@@ -430,5 +438,46 @@ describe("class", () => {
     expect(bird.run()).toBeTruthy();
     expect(bird.name).toBe("bird");
     expect(JSON.stringify(bird)).toBe('{"name":"bird"}');
+  });
+});
+
+describe("accessor", () => {
+  test("previous: normal prop", () => {
+    const app = model({ count: 1 });
+    app.count++;
+    app.count++;
+    expect(previous(() => app.count)).toBe(2);
+    expect(original(() => app.count)).toBe(1);
+  });
+
+  test("previous: computed prop", () => {
+    const app = model({
+      count: 1,
+      get doubledCount() {
+        return this.count * 2;
+      },
+    });
+    app.count++;
+    app.count++;
+    // for computed property, original === current === previous
+    expect(original(() => app.doubledCount)).toBe(6);
+    expect(previous(() => app.doubledCount)).toBe(6);
+  });
+
+  test("peeking", () => {
+    const app = model({
+      count: 1,
+      get doubledCount() {
+        return peek(() => this.count) * 2;
+      },
+    });
+    expect(app.doubledCount).toBe(2);
+    app.count++;
+    app.count++;
+    expect(app.doubledCount).toBe(2);
+    expect(app.doubledCount).toBe(2);
+    expect(app.doubledCount).toBe(2);
+    refresh(app, "doubledCount");
+    expect(app.doubledCount).toBe(6);
   });
 });

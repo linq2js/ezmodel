@@ -81,7 +81,7 @@ describe("view", () => {
             log("version:" + version);
           },
         },
-        { unstable: { id: true } }
+        { unstable: { id: 1 } }
       );
 
       effect(() => {
