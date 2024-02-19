@@ -99,46 +99,6 @@ export type ScopeFn = {
 
 let currentSnapshot: ScopeSnapshot;
 
-const createScope = (create: AnyFunc) => {
-  const accessor = (...args: any[]): any => {
-    // OVERLOAD: scopeDef() get current instance of this scope type
-    if (!args.length) {
-      return currentSnapshot(accessor);
-    }
-
-    const [fn, modifier] = args;
-    let scopeInstance: any;
-    let scopeModifier: AnyFunc | undefined;
-
-    // OVERLOAD: scopeDef(fn, modifier?)
-    if (typeof modifier === "function") {
-      scopeInstance = create();
-      scopeModifier = modifier;
-    } else {
-      // OVERLOAD: scopeDef(fn, scopeInstance?)
-      scopeInstance = modifier ?? create();
-    }
-
-    scopeModifier?.(scopeInstance);
-
-    return [
-      scopeInstance,
-      currentSnapshot(
-        new Map([[accessor as unknown as ScopeDef<any>, scopeInstance]]),
-        fn
-      ),
-    ];
-  };
-
-  return Object.assign(accessor, {
-    type: "scope",
-    new: create,
-    none(fn: AnyFunc) {
-      return accessor(fn, NO_SCOPE)[1];
-    },
-  }) as any;
-};
-
 const snapshotOf = new WeakMap<any, ScopeSnapshot>();
 /**
  * @param stack Storing the active scopes as stack. The structure is as follows, the active is the first:
@@ -232,12 +192,12 @@ const createSnapshot = (stack: WeakMap<ScopeDef<any>, any>[] = []) => {
     }
   };
 
-  const findScope = (def: ScopeDef<any>) => {
+  const findScope = (def: ScopeDef<any>, noScopeValue?: any) => {
     for (const item of stack) {
       const value = item.get(def);
       if (value) {
         if (value === NO_SCOPE) {
-          return undefined;
+          return noScopeValue;
         }
         return value;
       }
@@ -270,7 +230,7 @@ const createSnapshot = (stack: WeakMap<ScopeDef<any>, any>[] = []) => {
 
       throw new Error(`No overload with ${typeof value}`);
     },
-    { type: "snapshot" as const, stack }
+    { type: "snapshot" as const, stack, findScope }
   );
 
   return snapshot;
@@ -313,6 +273,46 @@ export const scope: ScopeFn = (...args: any[]): any => {
   });
   modifier?.(scopes);
   return [scopes, currentSnapshot(scopeMap, fn)];
+};
+
+const createScope = (create: AnyFunc) => {
+  const accessor = (...args: any[]): any => {
+    // OVERLOAD: scopeDef() get current instance of this scope type
+    if (!args.length) {
+      return currentSnapshot(accessor);
+    }
+
+    const [fn, modifier] = args;
+    let scopeInstance: any;
+    let scopeModifier: AnyFunc | undefined;
+
+    // OVERLOAD: scopeDef(fn, modifier?)
+    if (typeof modifier === "function") {
+      scopeInstance = create();
+      scopeModifier = modifier;
+    } else {
+      // OVERLOAD: scopeDef(fn, scopeInstance?)
+      scopeInstance = modifier ?? create();
+    }
+
+    scopeModifier?.(scopeInstance);
+
+    return [
+      scopeInstance,
+      currentSnapshot(
+        new Map([[accessor as unknown as ScopeDef<any>, scopeInstance]]),
+        fn
+      ),
+    ];
+  };
+
+  return Object.assign(accessor, {
+    type: "scope",
+    new: create,
+    none(fn: AnyFunc) {
+      return accessor(fn, NO_SCOPE)[1];
+    },
+  }) as any;
 };
 
 currentSnapshot = createSnapshot();

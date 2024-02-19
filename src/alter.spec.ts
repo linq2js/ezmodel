@@ -108,4 +108,12 @@ describe("alter", () => {
     expect(parent.level1.level2.child).toBe(child);
     expect(child.name).toBe("New name");
   });
+
+  test("nested model", () => {
+    const parent = model({ children: [model({})] });
+
+    alter(() => {
+      parent.children.splice(0, 1);
+    });
+  });
 });

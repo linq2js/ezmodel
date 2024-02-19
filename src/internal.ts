@@ -1,4 +1,4 @@
-import { AnyFunc, Dictionary, Listenable, Rule, Tag } from "./types";
+import { AnyFunc, Dictionary, Listenable, ModelOptions } from "./types";
 
 export type StateBase = Dictionary;
 
@@ -37,6 +37,7 @@ export const MODEL_TYPE = Symbol("ezmodel.model");
 export const NO_WRAP = Symbol("ezmodel.noWrap");
 
 export type ModelApi = {
+  id: number;
   strict: boolean;
   dispose: AnyFunc;
   stale: AnyFunc;
@@ -49,68 +50,3 @@ export type ModelApi = {
 };
 
 export type DescriptorMap = Record<string, PropertyDescriptor>;
-
-export type ModelOptions<T> = {
-  tags?: Tag<T>[];
-
-  /**
-   * LOCAL MODEL ONLY: the model will update specified props according to new input props
-   * ```js
-   * // WITHOUT UNSTABLE OPTION
-   * const counter = model({ count: props.initCount })
-   * console.log(counter.count)
-   *
-   * // initial rendering:
-   * props.initCount = 1
-   * counter.count = 1
-   *
-   * // changing counter.count to 2
-   * props.initCount = 1
-   * counter.count = 2
-   *
-   * // re-render with new props { initCount: 3 }
-   * props.initCount = 3
-   * counter.count = 2 // the count value is not the same as initCount
-   *
-   * // WITH UNSTABLE OPTION
-   * const counter = model({ count: props.initCount }, { unstable: { count: true } })
-   * console.log(counter.count)
-   *
-   * // initial rendering:
-   * props.initCount = 1
-   * counter.count = 1
-   *
-   * // changing counter.count to 2
-   * props.initCount = 1
-   * counter.count = 2
-   *
-   * // re-render with new props { initCount: 3 }
-   * props.initCount = 3
-   * counter.count = 3 // the count value is the same as initCount
-   * ```
-   */
-  unstable?: {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?:
-      | boolean
-      | 1
-      | 0
-      | undefined;
-  };
-
-  rules?: { [key in keyof T]?: Rule<Awaited<T[key]>> };
-
-  /**
-   * This method will be invoked to load model persisted data until the first property access of the model occurs.
-   * @returns
-   */
-  load?: () => {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?: T[key];
-  };
-
-  /**
-   * This method will be called to save model data to persistent storage whenever model properties have been changed.
-   * @param model
-   * @returns
-   */
-  save?: (model: T) => void;
-};

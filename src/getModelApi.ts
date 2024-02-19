@@ -1,5 +1,6 @@
 import { MODEL_TYPE, ModelApi } from "./internal";
+import { raw } from "./utils";
 
 export const getModelApi = (value: any) => {
-  return value?.[MODEL_TYPE] as ModelApi | undefined;
+  return raw(value)?.[MODEL_TYPE] as ModelApi | undefined;
 };

@@ -1,5 +1,6 @@
 import { getValue, setValue } from "./alter";
 import { async } from "./async";
+import { cancellable } from "./cancellable";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
 import { getModelApi } from "./getModelApi";
@@ -12,7 +13,6 @@ import {
   NO_WRAP,
   StateBase,
   ActionProp,
-  ModelOptions,
   Prop,
   PropSetter,
   UnknownProp,
@@ -29,6 +29,7 @@ import {
   NonFunctionProps,
   Model,
   Dictionary,
+  ModelOptions,
 } from "./types";
 import { NOOP, isClass, isPromiseLike } from "./utils";
 
@@ -48,6 +49,7 @@ const createStateProp = <T>(
   let thisObject: any;
   let isComputing = false;
   let isTracking = false;
+  let cancelPrevious: VoidFunction | undefined;
   const onCleanup = emitter();
   const onChange = emitter();
   const dependencies = new Set<StateProp>();
@@ -67,6 +69,7 @@ const createStateProp = <T>(
     if (isComputing) return;
     isComputing = true;
     try {
+      cancelPrevious?.();
       dependencies.clear();
       onCleanup.emit();
       onCleanup.clear();
@@ -89,11 +92,18 @@ const createStateProp = <T>(
 
       try {
         isTracking = true;
-        const [{ onTrack }, result] = trackable(() => {
-          const value = propAccessor.none(() => getState.call(thisObject));
+        const [
+          {
+            trackable: { onTrack },
+            cancellable: { cancel },
+          },
+          result,
+        ] = scope({ trackable, cancellable }, () => {
+          let value = propAccessor.none(() => getState.call(thisObject));
           return { value };
         });
         current = result;
+        cancelPrevious = cancel;
         onTrack((x) => {
           if ("$state" in x) {
             addDependency(x.$state as StateProp);
@@ -122,7 +132,8 @@ const createStateProp = <T>(
       }
     } else {
       try {
-        current = { value: getState() };
+        let value = getState();
+        current = { value };
       } catch (error) {
         current = { error };
       }
@@ -183,43 +194,22 @@ const createStateProp = <T>(
       return;
     }
 
-    let transformed = false;
-    const transform = (newValue: any) => {
-      value = newValue;
-      transformed = true;
-    };
+    let shouldCheckIdentityAgain = false;
 
-    if (isPromiseLike(value)) {
-      const ar = async(value);
-      if (validate) {
-        if (ar.loading) {
-          value = async(
-            ar.then((resolved) => {
-              validate(resolved, transform);
-              return resolved;
-            })
-          ) as T;
-        } else if (ar.error) {
-          // no need to validate
-          value = ar as T;
-        } else {
-          // validate resolved value
-          try {
-            validate(ar.data, transform);
-            value = ar as T;
-          } catch (ex) {
-            value = async.reject(ex) as T;
-          }
-        }
-      } else {
-        value = ar as T;
-      }
-    } else if (validate) {
-      validate(value, transform);
+    if (validate) {
+      value = async.map(value, (awaited) => {
+        validate?.(awaited, (newValue) => {
+          // if the validator is called in async thread, shouldCheckIdentityAgain = false and the checking below will be skipped
+          shouldCheckIdentityAgain = true;
+          awaited = newValue;
+        });
+
+        return awaited;
+      });
     }
 
     // verify data duplication again
-    if (transformed) {
+    if (shouldCheckIdentityAgain) {
       if (current && "value" in current && current.value === value) {
         return;
       }
@@ -441,11 +431,17 @@ const createModelProxy = (
     });
     return result;
   };
+  const toString = () => {
+    return `ModelProxy:${JSON.stringify(toJSON())}`;
+  };
 
   return new Proxy(target, {
     get(_, prop) {
       if (prop === "toJSON") {
         return toJSON;
+      }
+      if (prop === "toString") {
+        return toString;
       }
       return getProp(prop).get();
     },
@@ -602,6 +598,7 @@ export const model: ModelFn = Object.assign(createFactory(false), {
   strict: createFactory(true),
 });
 
+let uniqueId = 1;
 const createModel = <T extends StateBase>(
   strict: boolean,
   constructor: () => readonly [T, DescriptorMap],
@@ -788,7 +785,8 @@ const createModel = <T extends StateBase>(
   };
 
   const undefinedProp: UnknownProp = { type: "unknown", get: NOOP };
-  const api: ModelApi = {
+  const api: ModelApi = Object.create({
+    id: uniqueId++,
     refresh,
     stale,
     dispose,
@@ -798,7 +796,7 @@ const createModel = <T extends StateBase>(
     configure,
     strict,
     options,
-  };
+  });
   const apiProp: UnknownProp = {
     type: "unknown",
     get: () => api,

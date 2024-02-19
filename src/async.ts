@@ -489,6 +489,8 @@ export type AsyncFn = {
   func: <T>(
     asyncImport: () => Promise<T>
   ) => T extends AnyFunc ? T : T extends { default: infer F } ? F : never;
+
+  map<T, V>(value: V, mapper: (awaited: Awaited<V>, sync: boolean) => T): T;
 };
 
 const asyncResult = <T>(value: T | Promise<T>): AsyncResult<T> => {
@@ -505,6 +507,21 @@ export const async: AsyncFn = Object.assign(
     return asyncResult(args[0]);
   },
   {
+    map(value: any, mapper: (value: any, sync: boolean) => any): any {
+      if (isPromiseLike(value)) {
+        const ar = async(value);
+        if (ar.error) return ar;
+        if (ar.loading) {
+          return async(value.then((awaited) => mapper(awaited, false)));
+        }
+        try {
+          return async(mapper(ar.data, false));
+        } catch (ex) {
+          return async.reject(ex);
+        }
+      }
+      return mapper(value, true);
+    },
     reject(reason: any) {
       if (isPromiseLike(reason)) {
         return asyncResult(reason);

@@ -1,3 +1,4 @@
+import { isDraft, original } from "immer";
 import { AnyFunc } from "./types";
 
 export const NOOP = () => {
@@ -131,4 +132,8 @@ export const isClass = (func: unknown) => {
     typeof func === "function" &&
     /^class\s/.test(Function.prototype.toString.call(func))
   );
+};
+
+export const raw = <T>(value: T): T => {
+  return isDraft(value) ? (original(value) as T) : value;
 };

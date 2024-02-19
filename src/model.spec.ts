@@ -8,6 +8,7 @@ import {
   previous,
   original,
   peek,
+  isModel,
 } from "./model";
 import { z } from "zod";
 
