@@ -1,8 +1,9 @@
-import { createDraft, finishDraft, produce } from "immer";
+import { createDraft, current, finishDraft, produce } from "immer";
 
 import { isPromiseLike } from "./utils";
 import { AnyFunc, Dictionary, NoInfer } from "./types";
 import { async } from "./async";
+import { propAccessor } from "./propAccessor";
 
 export type AlterFn = {
   <T>(fn: () => T): T;
@@ -107,6 +108,15 @@ export const getValue = <T>(
       const base = { value };
       item = { base, draft: createDraft(base) };
       alteringItems.set(update, item);
+    }
+
+    const accessorType = propAccessor()?.type;
+    if (accessorType === "original") {
+      return item.base.value;
+    }
+
+    if (accessorType === "peek") {
+      return current(item.draft).value;
     }
 
     return item.draft.value;

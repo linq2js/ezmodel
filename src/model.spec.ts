@@ -1,17 +1,8 @@
 import { alter } from "./alter";
-import { filter } from "./emitter";
-import {
-  dispose,
-  refresh,
-  stale,
-  model,
-  previous,
-  original,
-  peek,
-  isModel,
-} from "./model";
+import { filter, on } from "./emitter";
+import { dispose, refresh, stale, model } from "./model";
 import { z } from "zod";
-
+import { previous, original, peek } from "./propAccessor";
 describe("basic usages", () => {
   test("getting value", () => {
     const counter = model({ count: 1 });
@@ -480,5 +471,66 @@ describe("accessor", () => {
     expect(app.doubledCount).toBe(2);
     refresh(app, "doubledCount");
     expect(app.doubledCount).toBe(6);
+  });
+});
+
+describe("type", () => {
+  type Todo = {
+    id: number;
+    title: string;
+  };
+
+  test("re-configure", () => {
+    const totoType = model.type<Todo>();
+    const todo1 = totoType({ id: 1, title: "todo1" });
+    const todo2 = totoType({ id: 1, title: "todo2" });
+    expect(todo1).toBe(todo2);
+    expect(todo1.title).toBe("todo2");
+  });
+
+  test("with extra", () => {
+    const totoType = model.type<Todo>().with((props) => ({
+      changeTitle(newTitle: string) {
+        props.title = newTitle;
+      },
+    }));
+
+    const todo1 = totoType({ id: 1, title: "todo 1" });
+    const todo2 = totoType({ id: 1, title: "todo 1" });
+    const todo3 = totoType({ id: 2, title: "todo 2" });
+
+    expect(todo1).toBe(todo2);
+    todo3.changeTitle("new title");
+    expect(todo3.title).toBe("new title");
+    expect(todo1.title).toBe("todo 1");
+    // changing todo 2's title will be affected to todo 1
+    todo2.changeTitle("new title");
+    expect(todo1.title).toBe("new title");
+  });
+
+  test("without extra", () => {
+    const totoType = model.type<Todo>();
+    const todo1 = totoType({ id: 1, title: "todo 1" });
+    const todo2 = totoType({ id: 1, title: "todo 1" });
+    expect(todo1).toBe(todo2);
+  });
+
+  test("init", () => {
+    const log = jest.fn();
+    const totoType = model
+      .type<Todo>()
+      .with({ updated() {} })
+      .init((props) => {
+        on(props.updated, () => log("updated" + props.id));
+      });
+
+    const todo1 = totoType({ id: 1, title: "todo 1" });
+    const todo2 = totoType({ id: 2, title: "todo 2" });
+
+    todo1.updated();
+    todo1.updated();
+    todo2.updated();
+
+    expect(log.mock.calls).toEqual([["updated1"], ["updated1"], ["updated2"]]);
   });
 });

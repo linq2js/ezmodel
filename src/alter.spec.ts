@@ -1,6 +1,7 @@
 import { alter } from "./alter";
 import { async } from "./async";
 import { model, stale } from "./model";
+import { peek } from "./propAccessor";
 
 describe("alter", () => {
   test("single model", () => {
@@ -115,5 +116,15 @@ describe("alter", () => {
     alter(() => {
       parent.children.splice(0, 1);
     });
+  });
+
+  test("alter and peek", () => {
+    let value: any;
+    const parent = model({ sub: { name: "Ging" } });
+    alter(() => {
+      value = peek(() => parent.sub);
+    });
+
+    expect(value).toBe(parent.sub);
   });
 });

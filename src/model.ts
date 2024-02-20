@@ -19,6 +19,7 @@ import {
   ModelApi,
 } from "./internal";
 import { local } from "./local";
+import { propAccessor } from "./propAccessor";
 import { scope } from "./scope";
 import { trackable } from "./trackable";
 import {
@@ -30,8 +31,69 @@ import {
   Model,
   Dictionary,
   ModelOptions,
+  ModelType,
 } from "./types";
 import { NOOP, isClass, isPromiseLike } from "./utils";
+
+export type DisposeFn = {
+  <T extends StateBase>(models: T[]): void;
+  <T extends StateBase>(model: T): void;
+};
+
+export type StaleFn = {
+  <T extends StateBase>(model: T, notify: boolean): void;
+  <T extends StateBase>(
+    model: T,
+    prop?: keyof NonFunctionProps<T>,
+    notify?: boolean
+  ): void;
+  <T extends StateBase>(
+    model: T,
+    props?: (keyof NonFunctionProps<T>)[],
+    notify?: boolean
+  ): void;
+  <T extends StateBase>(models: T[], notify?: boolean): void;
+};
+
+export type RefreshFn = {
+  (when: Listenable | Listenable<any>[]): void;
+
+  <T extends StateBase>(model: T, prop?: keyof NonFunctionProps<T>): void;
+  <T extends StateBase>(model: T, props?: (keyof NonFunctionProps<T>)[]): void;
+  <T extends StateBase>(models: T[]): void;
+};
+
+export type ReadonlyModel<T> = Model<Readonly<T>>;
+
+export type State<T> = T extends () => infer R
+  ? R
+  : T extends new () => infer R
+  ? R
+  : T;
+
+/**
+ * model(base, initFn, options)
+ * model(props, options)
+ */
+
+export type ModelFn = {
+  strict: {
+    <TInit>(init: TInit): ReadonlyModel<State<TInit>>;
+
+    <TInit>(
+      init: TInit,
+      options: ModelOptions<State<NoInfer<TInit>>>
+    ): ReadonlyModel<State<TInit>>;
+  };
+
+  <TInit>(init: TInit): Model<State<TInit>>;
+
+  <TInit>(init: TInit, options: ModelOptions<State<NoInfer<TInit>>>): Model<
+    State<TInit>
+  >;
+
+  type: typeof createModelType;
+};
 
 const createStateProp = <T>(
   descriptors: DescriptorMap,
@@ -478,36 +540,6 @@ const createModelProxy = (
   });
 };
 
-export type ReadonlyModel<T> = Model<Readonly<T>>;
-
-export type State<T> = T extends () => infer R
-  ? R
-  : T extends new () => infer R
-  ? R
-  : T;
-
-/**
- * model(base, initFn, options)
- * model(props, options)
- */
-
-export type ModelFn = {
-  strict: {
-    <TInit>(init: TInit): ReadonlyModel<State<TInit>>;
-
-    <TInit>(
-      init: TInit,
-      options: ModelOptions<State<NoInfer<TInit>>>
-    ): ReadonlyModel<State<TInit>>;
-  };
-
-  <TInit>(init: TInit): Model<State<TInit>>;
-
-  <TInit>(init: TInit, options: ModelOptions<State<NoInfer<TInit>>>): Model<
-    State<TInit>
-  >;
-};
-
 const descriptorCache = new WeakMap<object, DescriptorMap>();
 const baseClassCache = new WeakMap<object, AnyFunc[]>();
 const getAllBaseClasses = (cls: any) => {
@@ -594,14 +626,10 @@ const createFactory =
     return createModel(strict, constructor, options);
   };
 
-export const model: ModelFn = Object.assign(createFactory(false), {
-  strict: createFactory(true),
-});
-
-let uniqueId = 1;
+let modelUniqueId = 1;
 const createModel = <T extends StateBase>(
   strict: boolean,
-  constructor: () => readonly [T, DescriptorMap],
+  constructor: (proxy: T) => readonly [T, DescriptorMap],
   options: ModelOptions<any> = {}
 ): Model<T> => {
   const { tags, rules, save, load } = options;
@@ -612,6 +640,7 @@ const createModel = <T extends StateBase>(
   let descriptorsReady = false;
   const propInfoMap = new Map<string, Prop>();
   const onDispose = emitter();
+  const descriptors: DescriptorMap = {};
 
   const getProp: PropGetter = (prop) => {
     if (!descriptorsReady) {
@@ -664,12 +693,11 @@ const createModel = <T extends StateBase>(
     return false;
   };
 
-  const [{ dispose: factoryDispose }, [target, descriptors]] =
-    disposable(constructor);
-
   privateProxy = createModelProxy(descriptors, getProp, setProp);
 
-  onDispose.on(factoryDispose);
+  const [{ dispose: factoryDispose }, [target, customDescriptors]] = disposable(
+    () => constructor(privateProxy)
+  );
 
   if (isModel<T>(target)) {
     const targetApi = getModelApi(target);
@@ -685,10 +713,11 @@ const createModel = <T extends StateBase>(
     return target;
   }
 
-  const init =
-    typeof descriptors.init?.value === "function"
-      ? descriptors.init.value
-      : undefined;
+  Object.assign(descriptors, customDescriptors);
+
+  onDispose.on(factoryDispose);
+
+  const init = typeof target.init === "function" ? target.init : undefined;
 
   descriptorsReady = true;
 
@@ -762,10 +791,33 @@ const createModel = <T extends StateBase>(
       }
     });
   };
-  const configure = (props: Dictionary, unstable: Dictionary = {}) => {
+
+  const configure = (props: Dictionary, unstable: Dictionary | "all" = {}) => {
     Object.entries(props).forEach(([key, value]) => {
-      const info = propInfoMap.get(key);
-      if (!info) return;
+      let info = propInfoMap.get(key);
+      if (!info) {
+        if (unstable === "all") {
+          const descriptor = descriptors[key];
+          if (!descriptor) {
+            return;
+          }
+
+          info = createStateProp(
+            descriptors,
+            () => descriptor.value,
+            false,
+            getProp,
+            api.rules[key],
+            undefined,
+            saveWrapper
+          );
+
+          propInfoMap.set(key, info);
+        } else {
+          return;
+        }
+      }
+
       if (info.type === "action") {
         if (typeof value !== "function") {
           return;
@@ -779,14 +831,15 @@ const createModel = <T extends StateBase>(
       }
 
       // not unstable state
-      if (!unstable[key]) return;
+      if (unstable !== "all" && !unstable[key]) return;
+
       info.set(value);
     });
   };
 
   const undefinedProp: UnknownProp = { type: "unknown", get: NOOP };
   const api: ModelApi = Object.create({
-    id: uniqueId++,
+    id: modelUniqueId++,
     refresh,
     stale,
     dispose,
@@ -869,32 +922,118 @@ const createModel = <T extends StateBase>(
   return proxy;
 };
 
-export type DisposeFn = {
-  <T extends StateBase>(models: T[]): void;
-  <T extends StateBase>(model: T): void;
+export type ModelTypeOptions<TState> = ModelOptions<TState> & {
+  name?: string;
+  key?: keyof TState;
 };
 
-export type StaleFn = {
-  <T extends StateBase>(model: T, notify: boolean): void;
-  <T extends StateBase>(
-    model: T,
-    prop?: keyof NonFunctionProps<T>,
-    notify?: boolean
-  ): void;
-  <T extends StateBase>(
-    model: T,
-    props?: (keyof NonFunctionProps<T>)[],
-    notify?: boolean
-  ): void;
-  <T extends StateBase>(models: T[], notify?: boolean): void;
-};
+export const createModelType = <TState extends StateBase>(
+  options?: ModelTypeOptions<TState>
+) => {
+  const { name, key: keyProp = "id" } = options ?? {};
+  const extras: any[] = [];
+  const typeName = name || `modelType${modelUniqueId++}`;
+  const defaultInits = new Set<VoidFunction>();
+  const models = new Map<any, Model<any>>();
 
-export type RefreshFn = {
-  (when: Listenable | Listenable<any>[]): void;
+  const modelType: ModelType<TState, {}> = Object.assign(
+    (props: TState): any => {
+      // make sure all getters invoked
+      const values = { ...props };
+      const key = values[keyProp];
+      if (!key) {
+        throw new Error(
+          `The typed model ${typeName} must have ${keyProp as string} prop`
+        );
+      }
+      const cached = models.get(key);
 
-  <T extends StateBase>(model: T, prop?: keyof NonFunctionProps<T>): void;
-  <T extends StateBase>(model: T, props?: (keyof NonFunctionProps<T>)[]): void;
-  <T extends StateBase>(models: T[]): void;
+      if (cached) {
+        getModelApi(cached)?.configure(values, "all");
+        return cached;
+      }
+
+      const newModel = createModel(false, (proxy) => {
+        const runtimeDescriptors = getOwnPropertyDescriptors(values);
+
+        if (extras.length) {
+          const mergedDescriptors = {
+            ...runtimeDescriptors,
+          };
+          const runtimeInits = new Set<AnyFunc>();
+
+          extras.forEach((extra) => {
+            const props = typeof extra === "function" ? extra(proxy) : extra;
+            const { init, ...descriptors } = getOwnPropertyDescriptors(props);
+            if (init && typeof init.value === "function") {
+              runtimeInits.add(init.value);
+            }
+            Object.assign(mergedDescriptors, descriptors);
+          });
+
+          defaultInits.forEach((init) => runtimeInits.add(init));
+
+          const temp = {};
+
+          if (runtimeInits.size) {
+            Object.assign(temp, {
+              init() {
+                const model = this;
+                const disposeFunctions: VoidFunction[] = [];
+                runtimeInits.forEach((init) => {
+                  const result = init.call(model, model);
+                  if (typeof result === "function") {
+                    disposeFunctions.push(result);
+                  }
+                });
+                if (disposeFunctions.length) {
+                  return () => {
+                    disposeFunctions.forEach((dispose) => dispose());
+                  };
+                }
+              },
+            });
+          }
+
+          Object.defineProperties(temp, mergedDescriptors);
+
+          return [temp, mergedDescriptors];
+        }
+
+        return [values, runtimeDescriptors];
+      });
+
+      models.set(key, newModel);
+
+      return newModel;
+    },
+    {
+      type: "modelType" as const,
+      size: 0,
+      with<TExtra extends StateBase>(
+        input: TExtra | ((props: NoInfer<TState>) => TExtra)
+      ): any {
+        extras.push(input);
+        return this;
+      },
+      init(fn: AnyFunc): any {
+        defaultInits.add(fn);
+        return this;
+      },
+      each(callback: AnyFunc): any {
+        models.forEach(callback);
+      },
+      clear() {
+        models.clear();
+      },
+    }
+  );
+
+  Object.defineProperties(modelType, {
+    size: { get: () => models.size },
+  });
+
+  return modelType;
 };
 
 export const dispose: DisposeFn = (input) => {
@@ -930,21 +1069,7 @@ export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
 };
 
-const propAccessor = scope(() => ({
-  type: "previous" as "previous" | "original" | "peek",
-}));
-
-export const previous = <T>(fn: () => T): T => {
-  const [, result] = propAccessor(fn, (x) => (x.type = "previous"));
-  return result;
-};
-
-export const original = <T>(fn: () => T): T => {
-  const [, result] = propAccessor(fn, (x) => (x.type = "original"));
-  return result;
-};
-
-export const peek = <T>(fn: () => T): T => {
-  const [, result] = propAccessor(fn, (x) => (x.type = "peek"));
-  return result;
-};
+export const model: ModelFn = Object.assign(createFactory(false), {
+  strict: createFactory(true),
+  type: createModelType,
+});

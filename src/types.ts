@@ -232,3 +232,15 @@ export type ModelOptions<T> = {
    */
   save?: (model: T) => void;
 };
+
+export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
+  readonly type: "modelType";
+  readonly size: number;
+  (props: TState): Model<TState & TExtra>;
+  with<T extends StateBase>(
+    extraProps: T | ((props: TState & TExtra) => T)
+  ): ModelType<TState, TExtra & T>;
+  init(initFn: (model: Model<TState & TExtra>) => void | VoidFunction): this;
+  each(callback: (model: Model<TState & TExtra>) => void): void;
+  clear(): void;
+}

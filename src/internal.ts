@@ -45,7 +45,7 @@ export type ModelApi = {
   constructor: () => StateBase;
   descriptors: DescriptorMap;
   rules: Dictionary<Validator | undefined>;
-  configure(props: Dictionary, unstable?: Dictionary): void;
+  configure(props: Dictionary, unstable?: Dictionary | "all"): void;
   options: ModelOptions<any>;
 };
 
