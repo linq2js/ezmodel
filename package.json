@@ -30,8 +30,7 @@
     "publish:patch": "yarn publish:pre && npm version patch && yarn publish:push",
     "publish:minor": "yarn publish:pre && npm version minor && yarn publish:push",
     "publish:major": "yarn publish:pre && npm version major && yarn publish:push",
-    "publish:pre": "yarn test && yarn build",
-    "prepublish": "jest --clearCache",
+    "publish:pre": "yarn test && yarn build && jest --clearCache",
     "postpublish": "rimraf react"
   },
   "files": [
