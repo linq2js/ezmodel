@@ -10,3 +10,4 @@ export * from "./cancellable";
 export * from "./emitter";
 export * from "./propAccessor";
 export * from "./cache";
+export * from "./types";
