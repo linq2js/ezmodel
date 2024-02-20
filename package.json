@@ -12,6 +12,15 @@
     "url": "https://github.com/linq2js/ezmodel/issues"
   },
   "homepage": "https://github.com/linq2js/ezmodel/",
+  "keywords": [
+    "react",
+    "state",
+    "manager",
+    "management",
+    "redux",
+    "store",
+    "model"
+  ],
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {

@@ -4,7 +4,7 @@
 
 ## Overview
 
-ezmodel simplifies web application state management. It provides a clear API for both local and global states, making your code cleaner and more maintainable.
+`ezmodel` simplifies web application state management. It provides a clear API for both local and global states, making your code cleaner and more maintainable.
 
 ## Getting Started
 
@@ -43,9 +43,9 @@ const App = view(() => (
 
 ## Features
 
-- Ease of Use: Straightforward setup.
-- Reactivity: Seamless state-to-UI binding.
-- Performance: Optimized for efficiency.
+- **Ease of Use:** Straightforward setup.
+- **Reactivity:** Seamless state-to-UI binding.
+- **Performance:** Optimized for efficiency.
 
 ## Learn More
 
