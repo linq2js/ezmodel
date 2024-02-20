@@ -242,5 +242,10 @@ export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
   ): ModelType<TState, TExtra & T>;
   init(initFn: (model: Model<TState & TExtra>) => void | VoidFunction): this;
   each(callback: (model: Model<TState & TExtra>) => void): void;
+  update(
+    key: any,
+    propsOrRecipe: Partial<TState> | ((draft: TState & TExtra) => void)
+  ): Model<TState & TExtra> | undefined;
+  get(key: any): Model<TState & TExtra> | undefined;
   clear(): void;
 }

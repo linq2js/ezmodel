@@ -10,7 +10,8 @@ export type MapOptions<K, V> = {
 };
 
 export type ObjectKeyedMap<K, V, THasCreate extends boolean = false> = {
-  get: (key: K) => THasCreate extends true ? V : V | undefined;
+  get(key: K): THasCreate extends true ? V : V | undefined;
+  set(key: K, value: V): void;
   readonly size: number;
   clear: () => void;
   forEach: (callback: (value: V, key: K) => void) => void;
@@ -44,6 +45,7 @@ export const objectKeyedMap: CreateObjectKeyedMap = (options = {}) => {
       };
     }
     const index = list.findIndex((x) => equal(x.key, key));
+
     return {
       loc,
       index,
@@ -71,11 +73,25 @@ export const objectKeyedMap: CreateObjectKeyedMap = (options = {}) => {
     return item.value;
   };
 
+  const set = (key: any, value: any) => {
+    const { loc, item } = find(key);
+    if (item) {
+      item.value = value;
+    } else {
+      if (loc === "list") {
+        list.push({ key, value });
+      } else {
+        map.set(key, { key, value });
+      }
+    }
+  };
+
   return {
     get,
     get size() {
       return map.size + list.length;
     },
+    set,
     clear() {
       if (onRemove) {
         map.forEach((x) => onRemove(x.value, x.key));

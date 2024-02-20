@@ -1,4 +1,4 @@
-import { getValue, setValue } from "./alter";
+import { alter, getValue, setValue } from "./alter";
 import { async } from "./async";
 import { cancellable } from "./cancellable";
 import { disposable } from "./disposable";
@@ -19,6 +19,7 @@ import {
   ModelApi,
 } from "./internal";
 import { local } from "./local";
+import { objectKeyedMap } from "./objectKeyedMap";
 import { propAccessor } from "./propAccessor";
 import { scope } from "./scope";
 import { trackable } from "./trackable";
@@ -923,18 +924,16 @@ const createModel = <T extends StateBase>(
 };
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
-  name?: string;
   key?: keyof TState;
 };
 
 export const createModelType = <TState extends StateBase>(
   options?: ModelTypeOptions<TState>
 ) => {
-  const { name, key: keyProp = "id" } = options ?? {};
+  const { key: keyProp = "id" } = options ?? {};
   const extras: any[] = [];
-  const typeName = name || `modelType${modelUniqueId++}`;
   const defaultInits = new Set<VoidFunction>();
-  const models = new Map<any, Model<any>>();
+  const models = objectKeyedMap<any, Model<any>>();
 
   const modelType: ModelType<TState, {}> = Object.assign(
     (props: TState): any => {
@@ -942,9 +941,7 @@ export const createModelType = <TState extends StateBase>(
       const values = { ...props };
       const key = values[keyProp];
       if (!key) {
-        throw new Error(
-          `The typed model ${typeName} must have ${keyProp as string} prop`
-        );
+        throw new Error(`The typed model must have ${keyProp as string} prop`);
       }
       const cached = models.get(key);
 
@@ -1025,6 +1022,22 @@ export const createModelType = <TState extends StateBase>(
       },
       clear() {
         models.clear();
+      },
+      get(key: any): any {
+        return models.get(key);
+      },
+      update(key: any, propsOrRecipe: unknown): any {
+        const model = models.get(key);
+
+        if (model) {
+          if (typeof propsOrRecipe === "function") {
+            alter(() => propsOrRecipe(model));
+          } else {
+            Object.assign(model, propsOrRecipe);
+          }
+        }
+
+        return model;
       },
     }
   );
