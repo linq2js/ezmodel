@@ -25,9 +25,7 @@
     "postpublish": "rimraf react"
   },
   "files": [
-    "dist",
-    "src",
-    "react"
+    "**"
   ],
   "exports": {
     ".": {
