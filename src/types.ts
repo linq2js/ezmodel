@@ -53,19 +53,18 @@ export type ImmutableType =
 
 export type OnceOptions = { recent?: boolean };
 
-export type Action<TResult, TArgs extends any[]> = {
-  (...args: TArgs): TResult;
+export type Action<T extends AnyFunc> = T & {
   readonly called: number;
-  readonly prevResult: TResult | undefined;
+  readonly prevResult: ReturnType<T> | undefined;
   readonly result:
-    | (TResult extends Promise<infer R> ? AsyncResult<R> : TResult)
+    | (ReturnType<T> extends Promise<infer R> ? AsyncResult<R> : ReturnType<T>)
     | undefined;
   readonly error: any;
   readonly loading: boolean;
-  readonly awaited: Awaited<TResult> | undefined;
-  load(...args: TArgs): TResult;
+  readonly awaited: Awaited<ReturnType<T>> | undefined;
+  load(...args: Parameters<T>): ReturnType<T>;
   reload(): boolean;
-  on(listener: Listener<TArgs>): VoidFunction;
+  on(listener: Listener<Parameters<T>>): VoidFunction;
 };
 
 export interface Loader<T> {
@@ -115,10 +114,10 @@ export type Tag<T = any> = {
 export type PublicProps<T> = Omit<
   {
     // exclude private props
-    [key in keyof T as key extends `_${string}` ? never : key]: T[key] extends (
-      ...args: infer TArgs
-    ) => infer TResult
-      ? Action<TResult, TArgs>
+    [key in keyof T as key extends `_${string}`
+      ? never
+      : key]: T[key] extends AnyFunc
+      ? Action<T[key]>
       : T[key] extends Promise<infer R>
       ? AsyncResult<R>
       : T[key];

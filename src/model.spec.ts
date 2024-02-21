@@ -208,6 +208,16 @@ describe("basic usages", () => {
     app.count2++;
     expect(log).toHaveBeenLastCalledWith('{"count1":2,"count2":3}');
   });
+
+  test("keep generic action", () => {
+    const app = model({
+      doSomething<T>() {
+        return undefined as T;
+      },
+    });
+
+    app.doSomething<number>();
+  });
 });
 
 describe("async", () => {
