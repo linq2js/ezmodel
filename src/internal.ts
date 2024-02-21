@@ -24,8 +24,9 @@ export type ActionProp = UpdatableProp & {
   setDispatcher(dispatcher: AnyFunc): void;
 };
 export type UnknownProp = PropBase & { type: "unknown" };
+export type UndefinedProp = PropBase & { type: "undefined" };
 
-export type Prop = StateProp | ActionProp | UnknownProp;
+export type Prop = StateProp | ActionProp | UnknownProp | UndefinedProp;
 
 export type PropGetter = (prop: string | symbol) => Prop;
 export type PropSetter = (prop: string | symbol, value: any) => boolean;
@@ -36,9 +37,11 @@ export const MODEL_TYPE = Symbol("ezmodel.model");
 
 export const NO_WRAP = Symbol("ezmodel.noWrap");
 
+export type ModelKind = "normal" | "strict" | "dynamic";
+
 export type ModelApi = {
   id: number;
-  strict: boolean;
+  kind: ModelKind;
   dispose: AnyFunc;
   stale: AnyFunc;
   refresh: AnyFunc;

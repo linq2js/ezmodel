@@ -4,6 +4,11 @@ import { dispose, refresh, stale, model } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
 describe("basic usages", () => {
+  test("Object.assign", () => {
+    const m1 = model({ value: 1 });
+    const m2 = Object.assign(m1, { value: 2 });
+    expect(m1).toBe(m2);
+  });
   test("getting value", () => {
     const counter = model({ count: 1 });
 
@@ -532,5 +537,21 @@ describe("type", () => {
     todo2.updated();
 
     expect(log.mock.calls).toEqual([["updated1"], ["updated1"], ["updated2"]]);
+  });
+
+  test("prevent changing key", () => {
+    const totoType = model.type<Todo>();
+
+    const todo = totoType({ id: 1, title: "todo" });
+    expect(() => (todo.id = 2)).toThrow();
+    expect(todo.id).toBe(1);
+  });
+});
+
+describe("dynamic", () => {
+  test("dynamic", () => {
+    const dynamic = Object.assign(model.dynamic<number>(), { p1: 1, p2: 2 });
+    expect(dynamic.p1).toBe(1);
+    expect(dynamic.p2).toBe(2);
   });
 });

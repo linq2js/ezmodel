@@ -17,6 +17,8 @@ import {
   PropSetter,
   UnknownProp,
   ModelApi,
+  ModelKind,
+  UndefinedProp,
 } from "./internal";
 import { local } from "./local";
 import { objectKeyedMap } from "./objectKeyedMap";
@@ -93,7 +95,11 @@ export type ModelFn = {
     State<TInit>
   >;
 
-  type: typeof createModelType;
+  dynamic<TValue = any>(
+    options?: ModelOptions<Record<string, TValue>>
+  ): Model<Record<string, TValue>>;
+
+  type: typeof createType;
 };
 
 const createStateProp = <T>(
@@ -138,7 +144,7 @@ const createStateProp = <T>(
       onCleanup.clear();
 
       if (!thisObject) {
-        thisObject = createModelProxy(
+        thisObject = createProxy(
           descriptors,
           // custom get prop
           (prop) => {
@@ -277,6 +283,11 @@ const createStateProp = <T>(
         return;
       }
     }
+
+    // The custom set method should be invoked prior to updating the property value to ensure validation is performed.
+    // Unlike with the computing process, we should not catch the validation error; this should be managed by the caller.
+    customSet?.(value);
+
     if (current) {
       previous = current;
     }
@@ -284,8 +295,6 @@ const createStateProp = <T>(
     current = { value };
 
     onChange.emit();
-
-    customSet?.(value);
   };
 
   const propInfo: StateProp = {
@@ -318,6 +327,7 @@ const createStateProp = <T>(
       }
     },
     refresh() {
+      // Refreshing is unnecessary if the property is being computed.
       if (isComputing) return;
       recompute();
       onChange.emit();
@@ -478,7 +488,7 @@ const createActionProp = <T, A extends any[]>(
   };
 };
 
-const createModelProxy = (
+const createProxy = (
   descriptors: DescriptorMap,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
@@ -590,7 +600,7 @@ const getOwnPropertyDescriptors = (obj: any): DescriptorMap => {
 };
 
 const createFactory =
-  (strict: boolean) =>
+  (kind: ModelKind) =>
   (init: Dictionary | AnyFunc, options?: ModelOptions<any>) => {
     const constructor =
       typeof init === "function"
@@ -607,7 +617,7 @@ const createFactory =
 
     // handle local model creation
     const localModel = local()?.get("model", () => {
-      const s = createModel(strict, constructor, options);
+      const s = createModel(kind, constructor, options);
 
       return {
         value: s,
@@ -624,12 +634,12 @@ const createFactory =
       return localModel.value as any;
     }
 
-    return createModel(strict, constructor, options);
+    return createModel(kind, constructor, options);
   };
 
 let modelUniqueId = 1;
 const createModel = <T extends StateBase>(
-  strict: boolean,
+  kind: ModelKind,
   constructor: (proxy: T) => readonly [T, DescriptorMap],
   options: ModelOptions<any> = {}
 ): Model<T> => {
@@ -686,15 +696,37 @@ const createModel = <T extends StateBase>(
   };
 
   const setProp: PropSetter = (prop, value) => {
-    const propInfo = getProp(prop);
+    let propInfo = getProp(prop);
+    // Add a new descriptor for dynamic model if it does not already exist.
+    if (propInfo.type === "undefined" && kind === "dynamic") {
+      const temp = { [prop]: undefined };
+      descriptors[prop as string] = Object.getOwnPropertyDescriptor(
+        temp,
+        prop
+      )!;
+
+      propInfo = createStateProp(
+        descriptors,
+        NOOP,
+        false,
+        getProp,
+        undefined,
+        undefined,
+        saveWrapper
+      );
+
+      propInfoMap.set(prop as string, propInfo);
+    }
+
     if (propInfo && "type" in propInfo && propInfo.type === "state") {
       propInfo.set(value);
       return true;
     }
+
     return false;
   };
 
-  privateProxy = createModelProxy(descriptors, getProp, setProp);
+  privateProxy = createProxy(descriptors, getProp, setProp);
 
   const [{ dispose: factoryDispose }, [target, customDescriptors]] = disposable(
     () => constructor(privateProxy)
@@ -705,7 +737,7 @@ const createModel = <T extends StateBase>(
 
     if (targetApi) {
       return createModel(
-        targetApi.strict,
+        targetApi.kind,
         targetApi.constructor as any,
         targetApi.options
       );
@@ -838,7 +870,7 @@ const createModel = <T extends StateBase>(
     });
   };
 
-  const undefinedProp: UnknownProp = { type: "unknown", get: NOOP };
+  const undefinedProp: UndefinedProp = { type: "undefined", get: NOOP };
   const api: ModelApi = Object.create({
     id: modelUniqueId++,
     refresh,
@@ -848,7 +880,7 @@ const createModel = <T extends StateBase>(
     constructor,
     rules: {},
     configure,
-    strict,
+    kind,
     options,
   });
   const apiProp: UnknownProp = {
@@ -911,10 +943,11 @@ const createModel = <T extends StateBase>(
     }
   });
 
-  proxy = strict
-    ? // strict proxy has no setters
-      createModelProxy(descriptors, getPublicProp)
-    : createModelProxy(descriptors, getPublicProp, setProp);
+  proxy =
+    kind === "strict"
+      ? // strict proxy has no setters
+        createProxy(descriptors, getPublicProp)
+      : createProxy(descriptors, getPublicProp, setProp);
 
   onDispose.on(initDispose);
 
@@ -927,7 +960,7 @@ export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;
 };
 
-export const createModelType = <TState extends StateBase>(
+export const createType = <TState extends StateBase>(
   options?: ModelTypeOptions<TState>
 ) => {
   const { key: keyProp = "id" } = options ?? {};
@@ -935,112 +968,122 @@ export const createModelType = <TState extends StateBase>(
   const defaultInits = new Set<VoidFunction>();
   const models = objectKeyedMap<any, Model<any>>();
 
-  const modelType: ModelType<TState, {}> = Object.assign(
-    (props: TState): any => {
-      // make sure all getters invoked
-      const values = { ...props };
-      const key = values[keyProp];
-      if (!key) {
-        throw new Error(`The typed model must have ${keyProp as string} prop`);
-      }
-      const cached = models.get(key);
+  const create = (props: TState): any => {
+    const key = props[keyProp];
+    // make sure all getters invoked
+    const values = { ...props };
 
-      if (cached) {
-        getModelApi(cached)?.configure(values, "all");
-        return cached;
-      }
-
-      const newModel = createModel(false, (proxy) => {
-        const runtimeDescriptors = getOwnPropertyDescriptors(values);
-
-        if (extras.length) {
-          const mergedDescriptors = {
-            ...runtimeDescriptors,
-          };
-          const runtimeInits = new Set<AnyFunc>();
-
-          extras.forEach((extra) => {
-            const props = typeof extra === "function" ? extra(proxy) : extra;
-            const { init, ...descriptors } = getOwnPropertyDescriptors(props);
-            if (init && typeof init.value === "function") {
-              runtimeInits.add(init.value);
-            }
-            Object.assign(mergedDescriptors, descriptors);
-          });
-
-          defaultInits.forEach((init) => runtimeInits.add(init));
-
-          const temp = {};
-
-          if (runtimeInits.size) {
-            Object.assign(temp, {
-              init() {
-                const model = this;
-                const disposeFunctions: VoidFunction[] = [];
-                runtimeInits.forEach((init) => {
-                  const result = init.call(model, model);
-                  if (typeof result === "function") {
-                    disposeFunctions.push(result);
-                  }
-                });
-                if (disposeFunctions.length) {
-                  return () => {
-                    disposeFunctions.forEach((dispose) => dispose());
-                  };
-                }
-              },
-            });
-          }
-
-          Object.defineProperties(temp, mergedDescriptors);
-
-          return [temp, mergedDescriptors];
-        }
-
-        return [values, runtimeDescriptors];
-      });
-
-      models.set(key, newModel);
-
-      return newModel;
-    },
-    {
-      type: "modelType" as const,
-      size: 0,
-      with<TExtra extends StateBase>(
-        input: TExtra | ((props: NoInfer<TState>) => TExtra)
-      ): any {
-        extras.push(input);
-        return this;
-      },
-      init(fn: AnyFunc): any {
-        defaultInits.add(fn);
-        return this;
-      },
-      each(callback: AnyFunc): any {
-        models.forEach(callback);
-      },
-      clear() {
-        models.clear();
-      },
-      get(key: any): any {
-        return models.get(key);
-      },
-      update(key: any, propsOrRecipe: unknown): any {
-        const model = models.get(key);
-
-        if (model) {
-          if (typeof propsOrRecipe === "function") {
-            alter(() => propsOrRecipe(model));
-          } else {
-            Object.assign(model, propsOrRecipe);
-          }
-        }
-
-        return model;
-      },
+    if (!key) {
+      throw new Error(`The typed model must have ${keyProp as string} prop`);
     }
-  );
+    const cached = models.get(key);
+
+    if (cached) {
+      delete values[keyProp];
+      getModelApi(cached)?.configure(values, "all");
+      return cached;
+    }
+
+    Object.defineProperty(values, keyProp, {
+      get() {
+        return key;
+      },
+      set() {
+        throw new Error("Modifying the key of a typed model is not allowed.");
+      },
+    });
+
+    const newModel = createModel("normal", (proxy) => {
+      const runtimeDescriptors = getOwnPropertyDescriptors(values);
+
+      if (extras.length) {
+        const mergedDescriptors = {
+          ...runtimeDescriptors,
+        };
+        const runtimeInits = new Set<AnyFunc>();
+
+        extras.forEach((extra) => {
+          const props = typeof extra === "function" ? extra(proxy) : extra;
+          const { init, ...descriptors } = getOwnPropertyDescriptors(props);
+          if (init && typeof init.value === "function") {
+            runtimeInits.add(init.value);
+          }
+          Object.assign(mergedDescriptors, descriptors);
+        });
+
+        defaultInits.forEach((init) => runtimeInits.add(init));
+
+        const temp = {};
+
+        if (runtimeInits.size) {
+          Object.assign(temp, {
+            init() {
+              const model = this;
+              const disposeFunctions: VoidFunction[] = [];
+              runtimeInits.forEach((init) => {
+                const result = init.call(model, model);
+                if (typeof result === "function") {
+                  disposeFunctions.push(result);
+                }
+              });
+              if (disposeFunctions.length) {
+                return () => {
+                  disposeFunctions.forEach((dispose) => dispose());
+                };
+              }
+            },
+          });
+        }
+
+        Object.defineProperties(temp, mergedDescriptors);
+
+        return [temp, mergedDescriptors];
+      }
+
+      return [values, runtimeDescriptors];
+    });
+
+    models.set(key, newModel);
+
+    return newModel;
+  };
+
+  const modelType: ModelType<TState, {}> = Object.assign(create, {
+    type: "modelType" as const,
+    size: 0,
+    with<TExtra extends StateBase>(
+      input: TExtra | ((props: NoInfer<TState>) => TExtra)
+    ): any {
+      extras.push(input);
+      return this;
+    },
+    init(fn: AnyFunc): any {
+      defaultInits.add(fn);
+      return this;
+    },
+    each(callback: AnyFunc): any {
+      models.forEach(callback);
+    },
+    clear() {
+      models.clear();
+    },
+    get(key: any): any {
+      return models.get(key);
+    },
+    update(key: any, propsOrRecipe: unknown): any {
+      const model = models.get(key);
+
+      if (model) {
+        if (typeof propsOrRecipe === "function") {
+          alter(() => propsOrRecipe(model));
+        } else {
+          Object.assign(model, propsOrRecipe);
+        }
+      }
+
+      return model;
+    },
+  });
 
   Object.defineProperties(modelType, {
     size: { get: () => models.size },
@@ -1082,7 +1125,12 @@ export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
 };
 
-export const model: ModelFn = Object.assign(createFactory(false), {
-  strict: createFactory(true),
-  type: createModelType,
+const createDynamic = createFactory("dynamic");
+
+export const model: ModelFn = Object.assign(createFactory("normal"), {
+  strict: createFactory("strict"),
+  dynamic(options?: ModelOptions<any>) {
+    return createDynamic({}, options);
+  },
+  type: createType,
 });
