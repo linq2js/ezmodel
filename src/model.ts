@@ -1061,8 +1061,16 @@ export const createType = <TState extends StateBase>(
       defaultInits.add(fn);
       return this;
     },
-    each(callback: AnyFunc): any {
-      models.forEach(callback);
+    each(callback: AnyFunc, filter?: AnyFunc): any {
+      if (filter) {
+        models.forEach((model) => {
+          if (filter(model)) {
+            callback(model);
+          }
+        });
+      } else {
+        models.forEach(callback);
+      }
     },
     clear() {
       models.clear();
@@ -1071,17 +1079,31 @@ export const createType = <TState extends StateBase>(
       return models.get(key);
     },
     update(key: any, propsOrRecipe: unknown): any {
-      const model = models.get(key);
+      const updatedModels: Model<any>[] = [];
 
-      if (model) {
+      if (typeof key === "function") {
+        const filter = key;
+        models.forEach((model) => {
+          if (filter(model)) {
+            updatedModels.push(model);
+          }
+        });
+      } else {
+        const model = models.get(key);
+        if (model) {
+          updatedModels.push(model);
+        }
+      }
+
+      updatedModels.forEach((model) => {
         if (typeof propsOrRecipe === "function") {
           alter(() => propsOrRecipe(model));
         } else {
           Object.assign(model, propsOrRecipe);
         }
-      }
+      });
 
-      return model;
+      return updatedModels;
     },
     from(value: any) {
       if (isPromiseLike(value)) {

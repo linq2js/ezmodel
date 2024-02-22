@@ -24,13 +24,14 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
+    "prebuild": "yarn test ",
     "build": "tsc && vite build",
     "test": "jest --detectOpenHandles",
     "publish:push": "git push",
     "publish:patch": "yarn publish:pre && npm version patch && yarn publish:push",
     "publish:minor": "yarn publish:pre && npm version minor && yarn publish:push",
     "publish:major": "yarn publish:pre && npm version major && yarn publish:push",
-    "publish:pre": "yarn test && yarn build && jest --clearCache",
+    "publish:pre": "yarn build && jest --clearCache",
     "postpublish": "rimraf react"
   },
   "files": [

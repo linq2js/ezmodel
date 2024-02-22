@@ -232,6 +232,8 @@ export type ModelOptions<T> = {
   save?: (model: T) => void;
 };
 
+export type ModelKey = string | number | {} | boolean;
+
 export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
   readonly type: "modelType";
   readonly size: number;
@@ -240,12 +242,15 @@ export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
     extraProps: T | ((props: TState & TExtra) => T)
   ): ModelType<TState, TExtra & T>;
   init(initFn: (model: Model<TState & TExtra>) => void | VoidFunction): this;
-  each(callback: (model: Model<TState & TExtra>) => void): void;
+  each(
+    callback: (model: Model<TState & TExtra>) => void,
+    filter?: (model: Model<TState & TExtra>) => boolean
+  ): void;
   update(
-    key: any,
+    keyOrFilter: ModelKey | ((model: Model<TState & TExtra>) => boolean),
     propsOrRecipe: Partial<TState> | ((draft: TState & TExtra) => void)
-  ): Model<TState & TExtra> | undefined;
-  get(key: any): Model<TState & TExtra> | undefined;
+  ): Model<TState & TExtra>[];
+  get(key: ModelKey): Model<TState & TExtra> | undefined;
   clear(): void;
   /**
    * create model from given value
