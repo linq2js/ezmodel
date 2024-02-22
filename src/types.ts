@@ -294,3 +294,9 @@ export namespace Infer {
     ? T
     : Model<T>;
 }
+
+export type ModelPart<TState, TPart, TVariant> = {
+  readonly type: "modelPart";
+  part(state: TState, variant: TVariant): TPart;
+  variant(value: TVariant): unknown;
+};

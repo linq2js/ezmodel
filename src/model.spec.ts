@@ -1,6 +1,6 @@
 import { alter } from "./alter";
 import { filter, on } from "./emitter";
-import { dispose, refresh, stale, model } from "./model";
+import { dispose, refresh, stale, model, part } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
 import { effect } from "./effect";
@@ -645,5 +645,31 @@ describe("ref", () => {
     expect(details1.title).toBe("title2");
     // make sure the log is called twice, the first for initial time and the second for changing preview1.title => detail1.title
     expect(log.mock.calls).toEqual([["title1"], ["title2"]]);
+  });
+});
+
+describe("part", () => {
+  test("unnamed part without variant", () => {
+    const values = [1, 2];
+    const numberPart = model.part((_: { name: string }) => values.shift());
+    const app = model({ name: "App" });
+    expect(part(app, numberPart)).toBe(1);
+    expect(part(app, numberPart)).toBe(1);
+    expect(part(app, numberPart)).toBe(1);
+  });
+
+  test("unnamed part with variant", () => {
+    const values = [1, 2];
+    const numberPart = model.part(
+      (_: { name: string }, variant: number) => (values.shift() ?? 0) + variant
+    );
+    const app = model({ name: "App" });
+    expect(part(app, numberPart, 1)).toBe(2);
+    expect(part(app, numberPart, 1)).toBe(2);
+    expect(part(app, numberPart, 1)).toBe(2);
+
+    expect(part(app, numberPart, 2)).toBe(4);
+    expect(part(app, numberPart, 2)).toBe(4);
+    expect(part(app, numberPart, 2)).toBe(4);
   });
 });

@@ -36,8 +36,9 @@ import {
   Dictionary,
   ModelOptions,
   ModelType,
+  ModelPart,
 } from "./types";
-import { NOOP, isClass, isPromiseLike } from "./utils";
+import { NOOP, equal, isClass, isPromiseLike } from "./utils";
 
 export type DisposeFn = {
   <T extends StateBase>(models: T[]): void;
@@ -105,6 +106,8 @@ export type ModelFn = {
   ): Model<Record<string, TValue>>;
 
   type: typeof createType;
+
+  part: CreatePartFn;
 };
 
 type EvaluateResult<T> = { value: T } | { error: any };
@@ -779,6 +782,70 @@ const createModel = <T extends StateBase>(
 
   const saveWrapper = save ? () => save(privateProxy) : undefined;
 
+  type Part = {
+    get(): any;
+    variant: any;
+    def: ModelPart<any, any, any>;
+    dispose: VoidFunction;
+  };
+
+  const parts = {
+    all: new Set<Part>(),
+    named: {} as Record<string, Part>,
+    unnamed: objectKeyedMap<any, Part>(),
+  };
+  const getPart = (
+    def: ModelPart<any, any, any>,
+    name: string | undefined,
+    variant: any
+  ) => {
+    const normalizedVariant = def.variant(variant);
+    const create = () => {
+      const [{ dispose }, result] = disposable(() =>
+        def.part(proxy, normalizedVariant)
+      );
+      const get = typeof result === "function" ? result : () => result;
+      const part = {
+        dispose,
+        def,
+        get,
+        variant: normalizedVariant,
+      };
+
+      parts.all.add(part);
+
+      return part;
+    };
+    const isNamedPart = !!name;
+    if (isNamedPart) {
+      const prev = parts.named[name];
+      if (prev) {
+        if (equal(prev.variant, variant)) {
+          return prev.get();
+        }
+        // should dispose prev part before creating new one
+        prev.dispose();
+        parts.all.delete(prev);
+      }
+
+      const part = create();
+
+      parts.named[name] = part;
+
+      return part.get();
+    }
+
+    const prev = parts.unnamed.get(normalizedVariant);
+    if (prev) {
+      return prev.get();
+    }
+    const part = create();
+
+    parts.unnamed.set(normalizedVariant, part);
+
+    return part.get();
+  };
+
   const stale = (...args: any[]) => {
     let notify = false;
     let props: string[] | undefined;
@@ -840,7 +907,7 @@ const createModel = <T extends StateBase>(
   };
   const dispose = () => {
     onDispose.emit();
-
+    parts.all.forEach((x) => x.dispose());
     propInfoMap.forEach((prop) => {
       if ("dispose" in prop) {
         prop.dispose();
@@ -895,7 +962,7 @@ const createModel = <T extends StateBase>(
   };
 
   const undefinedProp: UndefinedProp = { type: "undefined", get: NOOP };
-  const api: ModelApi = Object.create({
+  const api: ModelApi = {
     id: modelUniqueId++,
     refresh,
     stale,
@@ -906,7 +973,8 @@ const createModel = <T extends StateBase>(
     configure,
     kind,
     options,
-  });
+    part: getPart,
+  };
   const apiProp: UnknownProp = {
     type: "unknown",
     get: () => api,
@@ -1192,6 +1260,62 @@ export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
 };
 
+export type CreatePartFn = {
+  <TPart, TState, TVariant>(
+    part: (state: TState, variant: TVariant) => TPart | (() => TPart),
+    variant: (variant: NoInfer<TVariant>) => unknown
+  ): ModelPart<TState, TPart, TVariant>;
+
+  <TPart, TState, TVariant>(
+    part: (state: TState, variant: TVariant) => TPart | (() => TPart)
+  ): ModelPart<TState, TPart, TVariant>;
+
+  <TPart, TState>(part: (state: TState) => TPart | (() => TPart)): ModelPart<
+    TState,
+    TPart,
+    void
+  >;
+};
+
+export const createPart: CreatePartFn = (part: any, variant?: any): any => {
+  return {
+    type: "modelPart",
+    part,
+    variant: variant ?? ((value: any) => value),
+  };
+};
+
+export type PartFn = {
+  <TState, TPart, TVariant>(
+    state: TState,
+    partDef: ModelPart<NoInfer<TState>, TPart, TVariant>,
+    ...args: void extends TVariant ? [] : [variant: TVariant]
+  ): TPart;
+
+  <TState, TPart, TVariant>(
+    state: TState,
+    name: string,
+    partDef: ModelPart<NoInfer<TState>, TPart, TVariant>,
+    ...args: void extends TVariant ? [] : [variant: TVariant]
+  ): TPart;
+};
+
+export const part: PartFn = (model: any, ...args: any[]): any => {
+  let name: string | undefined;
+  let def: ModelPart<any, any, any>;
+  let variant: any;
+
+  // get named part
+  if (typeof args[0] === "string") {
+    [name, def, variant] = args;
+  } else {
+    // get unnamed part
+    [def, variant] = args;
+  }
+
+  return getModelApi(model)?.part(def, name, variant);
+};
+
 const createDynamic = createFactory("dynamic");
 
 export const model: ModelFn = Object.assign(createFactory("normal"), {
@@ -1200,4 +1324,5 @@ export const model: ModelFn = Object.assign(createFactory("normal"), {
     return createDynamic({}, options);
   },
   type: createType,
+  part: createPart,
 });

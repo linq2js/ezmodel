@@ -1,4 +1,10 @@
-import { AnyFunc, Dictionary, Listenable, ModelOptions } from "./types";
+import {
+  AnyFunc,
+  Dictionary,
+  Listenable,
+  ModelOptions,
+  ModelPart,
+} from "./types";
 
 export type StateBase = Dictionary;
 
@@ -45,11 +51,16 @@ export type ModelApi = {
   dispose: AnyFunc;
   stale: AnyFunc;
   refresh: AnyFunc;
-  constructor: () => StateBase;
+  constructor: (proxy: any) => readonly [StateBase, DescriptorMap];
   descriptors: DescriptorMap;
   rules: Dictionary<Validator | undefined>;
   configure(props: Dictionary, unstable?: Dictionary | "all"): void;
   options: ModelOptions<any>;
+  part(
+    def: ModelPart<any, any, any>,
+    name: string | undefined,
+    variant: any
+  ): any;
 };
 
 export type DescriptorMap = Record<string, PropertyDescriptor>;
