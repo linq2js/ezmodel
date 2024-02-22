@@ -438,28 +438,16 @@ const asyncResultProps = <T = any>(
   Object.defineProperties(ar, {
     loading: {
       get() {
-        if (loading) {
-          trackable()?.add(ar);
-        }
-
         return loading;
       },
     },
     error: {
       get() {
-        if (loading) {
-          trackable()?.add(ar);
-        }
-
         return error;
       },
     },
     data: {
       get() {
-        if (loading) {
-          trackable()?.add(ar);
-        }
-
         return data;
       },
     },

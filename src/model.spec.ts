@@ -365,6 +365,22 @@ describe("life cycle", () => {
 });
 
 describe("computed", () => {
+  test("no dependencies", () => {
+    const log = jest.fn();
+    const app = model({
+      get something() {
+        log("something");
+        return 1;
+      },
+    });
+
+    app.something;
+    app.something;
+    app.something;
+    app.something;
+
+    expect(log).toHaveBeenCalledTimes(1);
+  });
   test("self reference", () => {
     const counter = model({
       count: 1,
