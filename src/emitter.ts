@@ -68,6 +68,8 @@ export const emitter: EmitterFn = ({
       }
     },
     on(listener) {
+      if (listener === NOOP) return NOOP;
+
       if (emitted) {
         if (once) {
           if (typeof once === "object" && once.recent) {

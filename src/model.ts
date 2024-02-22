@@ -1,5 +1,6 @@
 import { alter, getValue, setValue } from "./alter";
 import { async } from "./async";
+import { CacheItem, cache } from "./cache";
 import { cancellable } from "./cancellable";
 import { disposable } from "./disposable";
 import { emitter } from "./emitter";
@@ -102,7 +103,10 @@ export type ModelFn = {
   type: typeof createType;
 };
 
+type EvaluateResult<T> = { value: T } | { error: any };
+
 const createStateProp = <T>(
+  cacheItem: CacheItem<EvaluateResult<T>>,
   descriptors: DescriptorMap,
   getState: () => T,
   computed: boolean,
@@ -111,10 +115,6 @@ const createStateProp = <T>(
   customSet?: (value: T) => void,
   save?: VoidFunction
 ): StateProp => {
-  type EvaluateResult = { value: T } | { error: any };
-  let current: EvaluateResult | undefined;
-  let previous: EvaluateResult | undefined;
-  let original: EvaluateResult | undefined;
   let thisObject: any;
   let isComputing = false;
   let isTracking = false;
@@ -122,12 +122,16 @@ const createStateProp = <T>(
   const onCleanup = emitter();
   const onChange = emitter();
   const dependencies = new Set<StateProp>();
+  const updater = {};
+  const setCurrent = (value: EvaluateResult<T> | undefined) => {
+    cacheItem.update(updater, value);
+  };
   const onDependencyChange = () => {
-    previous = current;
-    current = undefined;
+    cacheItem.previous = cacheItem.current;
+    setCurrent(undefined);
     onChange.emit();
   };
-
+  onCleanup.on(cacheItem.link(updater, onChange.emit));
   const addDependency = (info: StateProp) => {
     if (!dependencies.has(info)) {
       dependencies.add(info);
@@ -171,7 +175,7 @@ const createStateProp = <T>(
           let value = propAccessor.none(() => getState.call(thisObject));
           return { value };
         });
-        current = result;
+        setCurrent(result);
         cancelPrevious = cancel;
         onTrack((x) => {
           if ("$state" in x) {
@@ -182,7 +186,7 @@ const createStateProp = <T>(
           }
         });
       } catch (error) {
-        current = { error };
+        setCurrent({ error });
       } finally {
         isTracking = false;
       }
@@ -192,37 +196,42 @@ const createStateProp = <T>(
   };
 
   const ensureValueReady = () => {
-    if (current) return current;
+    if (cacheItem.current) return cacheItem.current;
 
     if (computed) {
       recompute();
-      if (!current) {
+      if (!cacheItem.current) {
         throw new Error("Something went wrong");
       }
     } else {
       try {
         let value = getState();
-        current = { value };
+        setCurrent({ value });
       } catch (error) {
-        current = { error };
+        setCurrent({ error });
       }
     }
 
+    const current = cacheItem.current as EvaluateResult<T> | undefined;
     if (current && "value" in current) {
       if (isPromiseLike(current.value)) {
         current.value = async(current.value) as any;
       }
     }
 
-    if (!original) {
-      original = current;
-      previous = original;
+    if (!cacheItem.original) {
+      cacheItem.original = cacheItem.current;
+      cacheItem.previous = cacheItem.original;
     }
 
-    return current;
+    return cacheItem.current;
   };
 
-  const valueOrError = (result: EvaluateResult) => {
+  const valueOrError = (result: EvaluateResult<T> | undefined) => {
+    if (!result) {
+      throw new Error("Prop value is not ready");
+    }
+
     if ("error" in result) {
       throw result.error;
     }
@@ -231,35 +240,39 @@ const createStateProp = <T>(
 
   const get = () => {
     const accessor = propAccessor();
-    current = ensureValueReady();
+    setCurrent(ensureValueReady());
 
     if (accessor) {
       if (isComputing && accessor.type !== "peek") {
-        return valueOrError(current);
+        return valueOrError(cacheItem.current);
       }
 
-      if (!original) {
-        original = current;
+      if (!cacheItem.original) {
+        cacheItem.original = cacheItem.current;
       }
 
       if (accessor.type === "original") {
-        return valueOrError(original);
+        return valueOrError(cacheItem.original);
       }
 
       if (accessor.type === "previous") {
-        if (!previous) {
-          previous = original;
+        if (!cacheItem.previous) {
+          cacheItem.previous = cacheItem.original;
         }
 
-        return valueOrError(previous);
+        return valueOrError(cacheItem.previous);
       }
     }
 
-    return valueOrError(current);
+    return valueOrError(cacheItem.current);
   };
 
   const set = (value: T) => {
-    if (current && "value" in current && current.value === value) {
+    if (
+      cacheItem.current &&
+      "value" in cacheItem.current &&
+      cacheItem.current.value === value
+    ) {
       return;
     }
 
@@ -279,7 +292,11 @@ const createStateProp = <T>(
 
     // verify data duplication again
     if (shouldCheckIdentityAgain) {
-      if (current && "value" in current && current.value === value) {
+      if (
+        cacheItem.current &&
+        "value" in cacheItem.current &&
+        cacheItem.current.value === value
+      ) {
         return;
       }
     }
@@ -288,11 +305,11 @@ const createStateProp = <T>(
     // Unlike with the computing process, we should not catch the validation error; this should be managed by the caller.
     customSet?.(value);
 
-    if (current) {
-      previous = current;
+    if (cacheItem.current) {
+      cacheItem.previous = cacheItem.current;
     }
 
-    current = { value };
+    setCurrent({ value });
 
     onChange.emit();
   };
@@ -313,9 +330,9 @@ const createStateProp = <T>(
       return setValue(set, value);
     },
     stale(notify?: boolean) {
-      if (!current) return;
-      previous = current;
-      current = undefined;
+      if (!cacheItem.current) return;
+      cacheItem.previous = cacheItem.current;
+      setCurrent(undefined);
       dependencies.forEach((dependency) => {
         if (dependency.hasError()) {
           dependency.stale(notify);
@@ -334,7 +351,7 @@ const createStateProp = <T>(
     },
     on: onChange.on,
     hasError() {
-      return !!current && "error" in current;
+      return !!cacheItem.current && "error" in cacheItem.current;
     },
     dispose() {
       onCleanup.emit();
@@ -641,9 +658,11 @@ let modelUniqueId = 1;
 const createModel = <T extends StateBase>(
   kind: ModelKind,
   constructor: (proxy: T) => readonly [T, DescriptorMap],
-  options: ModelOptions<any> = {}
+  options: ModelOptions<any> & {
+    ref?: { key: any; props: any };
+  } = {}
 ): Model<T> => {
-  const { tags, rules, save, load } = options;
+  const { tags, rules, save, load, ref: link } = options;
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
@@ -679,6 +698,7 @@ const createModel = <T extends StateBase>(
         const getValue = get ?? (() => getPersistedValue(prop, value));
 
         propInfo = createStateProp(
+          cache.get(link?.key, link?.props[prop]),
           descriptors,
           getValue,
           isComputed,
@@ -706,6 +726,7 @@ const createModel = <T extends StateBase>(
       )!;
 
       propInfo = createStateProp(
+        cache.get(link?.key, link?.props[prop]),
         descriptors,
         NOOP,
         false,
@@ -826,26 +847,27 @@ const createModel = <T extends StateBase>(
   };
 
   const configure = (props: Dictionary, unstable: Dictionary | "all" = {}) => {
-    Object.entries(props).forEach(([key, value]) => {
-      let info = propInfoMap.get(key);
+    Object.entries(props).forEach(([prop, value]) => {
+      let info = propInfoMap.get(prop);
       if (!info) {
         if (unstable === "all") {
-          const descriptor = descriptors[key];
+          const descriptor = descriptors[prop];
           if (!descriptor) {
             return;
           }
 
           info = createStateProp(
+            cache.get(link?.key, link?.props[prop]),
             descriptors,
             () => descriptor.value,
             false,
             getProp,
-            api.rules[key],
+            api.rules[prop],
             undefined,
             saveWrapper
           );
 
-          propInfoMap.set(key, info);
+          propInfoMap.set(prop, info);
         } else {
           return;
         }
@@ -864,7 +886,7 @@ const createModel = <T extends StateBase>(
       }
 
       // not unstable state
-      if (unstable !== "all" && !unstable[key]) return;
+      if (unstable !== "all" && !unstable[prop]) return;
 
       info.set(value);
     });
@@ -958,13 +980,14 @@ const createModel = <T extends StateBase>(
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;
+  ref?: { [key in keyof TState]?: any };
 };
 
 export const createType = <TState extends StateBase>(
-  options?: ModelTypeOptions<TState>
+  options?: ModelTypeOptions<NoInfer<TState>>
 ) => {
   const { key: keyProp = "id" } = options ?? {};
-  const extras: any[] = [];
+  const extraPropsBuilders: any[] = [];
   const defaultInits = new Set<VoidFunction>();
   const models = objectKeyedMap<any, Model<any>>();
 
@@ -993,69 +1016,77 @@ export const createType = <TState extends StateBase>(
       },
     });
 
-    const newModel = createModel("normal", (proxy) => {
-      const runtimeDescriptors = getOwnPropertyDescriptors(values);
+    const newModel = createModel(
+      "normal",
+      (proxy) => {
+        const runtimeDescriptors = getOwnPropertyDescriptors(values);
 
-      if (extras.length) {
-        const mergedDescriptors = {
-          ...runtimeDescriptors,
-        };
-        const runtimeInits = new Set<AnyFunc>();
+        if (extraPropsBuilders.length) {
+          const mergedDescriptors = {
+            ...runtimeDescriptors,
+          };
+          const runtimeInits = new Set<AnyFunc>();
 
-        extras.forEach((extra) => {
-          const props = typeof extra === "function" ? extra(proxy) : extra;
-          const { init, ...descriptors } = getOwnPropertyDescriptors(props);
-          if (init && typeof init.value === "function") {
-            runtimeInits.add(init.value);
-          }
-          Object.assign(mergedDescriptors, descriptors);
-        });
-
-        defaultInits.forEach((init) => runtimeInits.add(init));
-
-        const temp = {};
-
-        if (runtimeInits.size) {
-          Object.assign(temp, {
-            init() {
-              const model = this;
-              const disposeFunctions: VoidFunction[] = [];
-              runtimeInits.forEach((init) => {
-                const result = init.call(model, model);
-                if (typeof result === "function") {
-                  disposeFunctions.push(result);
-                }
-              });
-              if (disposeFunctions.length) {
-                return () => {
-                  disposeFunctions.forEach((dispose) => dispose());
-                };
-              }
-            },
+          extraPropsBuilders.forEach((extra) => {
+            const props = typeof extra === "function" ? extra(proxy) : extra;
+            const { init, ...descriptors } = getOwnPropertyDescriptors(props);
+            if (init && typeof init.value === "function") {
+              runtimeInits.add(init.value);
+            }
+            Object.assign(mergedDescriptors, descriptors);
           });
+
+          defaultInits.forEach((init) => runtimeInits.add(init));
+
+          const temp = {};
+
+          if (runtimeInits.size) {
+            Object.assign(temp, {
+              init() {
+                const model = this;
+                const disposeFunctions: VoidFunction[] = [];
+                runtimeInits.forEach((init) => {
+                  const result = init.call(model, model);
+                  if (typeof result === "function") {
+                    disposeFunctions.push(result);
+                  }
+                });
+                if (disposeFunctions.length) {
+                  return () => {
+                    disposeFunctions.forEach((dispose) => dispose());
+                  };
+                }
+              },
+            });
+          }
+
+          Object.defineProperties(temp, mergedDescriptors);
+
+          return [temp, mergedDescriptors];
         }
 
-        Object.defineProperties(temp, mergedDescriptors);
-
-        return [temp, mergedDescriptors];
+        return [values, runtimeDescriptors];
+      },
+      {
+        ...options,
+        ref: { key, props: options?.ref ?? {} },
       }
-
-      return [values, runtimeDescriptors];
-    });
+    );
 
     models.set(key, newModel);
 
     return newModel;
   };
 
-  const modelType: ModelType<TState, {}> = Object.assign(create, {
+  const modelType: ModelType<TState, {}, false> = Object.assign(create, {
     type: "modelType" as const,
     size: 0,
-    with<TExtra extends StateBase>(
-      input: TExtra | ((props: NoInfer<TState>) => TExtra)
-    ): any {
-      extras.push(input);
+    with(input: any): any {
+      extraPropsBuilders.push(input);
       return this;
+    },
+    strict() {
+      return modelType;
     },
     init(fn: AnyFunc): any {
       defaultInits.add(fn);

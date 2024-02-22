@@ -234,13 +234,23 @@ export type ModelOptions<T> = {
 
 export type ModelKey = string | number | {} | boolean;
 
-export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
+export interface ModelType<
+  TState extends StateBase,
+  TExtra extends StateBase,
+  TStrict = false
+> {
   readonly type: "modelType";
   readonly size: number;
-  (props: TState): Model<TState & TExtra>;
+  (props: TState): TStrict extends true
+    ? Model<Readonly<TState & TExtra>>
+    : Model<TState & TExtra>;
+
+  strict(): ModelType<TState, TExtra, true>;
+
   with<T extends StateBase>(
     extraProps: T | ((props: TState & TExtra) => T)
-  ): ModelType<TState, TExtra & T>;
+  ): ModelType<TState, TExtra & T, TStrict>;
+
   init(initFn: (model: Model<TState & TExtra>) => void | VoidFunction): this;
   each(
     callback: (model: Model<TState & TExtra>) => void,
@@ -270,8 +280,14 @@ export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
 }
 
 export namespace Infer {
-  export type model<T> = T extends ModelType<infer S, infer E>
-    ? Model<S & E>
+  export type model<T> = T extends ModelType<
+    infer TState,
+    infer TExtra,
+    infer TStrict
+  >
+    ? TStrict extends true
+      ? Model<Readonly<TState & TExtra>>
+      : Model<TState & TExtra>
     : T extends Model<any>
     ? T
     : Model<T>;

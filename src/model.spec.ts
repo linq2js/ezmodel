@@ -3,6 +3,7 @@ import { filter, on } from "./emitter";
 import { dispose, refresh, stale, model } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
+import { effect } from "./effect";
 describe("basic usages", () => {
   test("Object.assign", () => {
     const m1 = model({ value: 1 });
@@ -569,7 +570,7 @@ describe("type", () => {
     const totoType = model.type<Todo>();
 
     const todo = totoType({ id: 1, title: "todo" });
-    expect(() => (todo.id = 2)).toThrow();
+    expect(() => ((todo as any).id = 2)).toThrow();
     expect(todo.id).toBe(1);
   });
 });
@@ -579,5 +580,41 @@ describe("dynamic", () => {
     const dynamic = Object.assign(model.dynamic<number>(), { p1: 1, p2: 2 });
     expect(dynamic.p1).toBe(1);
     expect(dynamic.p2).toBe(2);
+  });
+});
+
+describe("event", () => {
+  test("default selector", () => {
+    const log = jest.fn();
+    const productPreviewType = model.type<{
+      id: number;
+      title: string;
+      thumbnail: string;
+    }>({ ref: { title: "product.title" } });
+
+    const productDetailsType = model.type<{
+      id: number;
+      title: string;
+      description: string;
+    }>({ ref: { title: "product.title" } });
+
+    const preview1 = productPreviewType({
+      id: 1,
+      title: "title1",
+      thumbnail: "",
+    });
+    const details1 = productDetailsType({
+      id: 1,
+      title: "title1",
+      description: "",
+    });
+    effect(() => {
+      log(details1.title);
+    });
+    expect(preview1.title).toBe("title1");
+    preview1.title = "title2";
+    expect(details1.title).toBe("title2");
+    // make sure the log is called twice, the first for initial time and the second for changing preview1.title => detail1.title
+    expect(log.mock.calls).toEqual([["title1"], ["title2"]]);
   });
 });
