@@ -24,8 +24,8 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "prebuild": "yarn test ",
-    "build": "tsc && vite build",
+    "prebuild": "rimraf react && yarn test ",
+    "build": "tsc && vite build && vite build",
     "test": "jest --detectOpenHandles",
     "publish:push": "git push",
     "publish:patch": "yarn publish:pre && npm version patch && yarn publish:push",
