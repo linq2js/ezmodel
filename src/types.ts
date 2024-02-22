@@ -263,3 +263,11 @@ export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
     ? Model<TState & TExtra>
     : never;
 }
+
+export namespace Infer {
+  export type model<T> = T extends ModelType<infer S, infer E>
+    ? Model<S & E>
+    : T extends Model<any>
+    ? T
+    : Model<T>;
+}
