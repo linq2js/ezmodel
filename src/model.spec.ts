@@ -583,8 +583,8 @@ describe("dynamic", () => {
   });
 });
 
-describe("event", () => {
-  test("default selector", () => {
+describe("ref", () => {
+  test("typed", () => {
     const log = jest.fn();
     const productPreviewType = model.type<{
       id: number;
@@ -608,6 +608,35 @@ describe("event", () => {
       title: "title1",
       description: "",
     });
+    effect(() => {
+      log(details1.title);
+    });
+    expect(preview1.title).toBe("title1");
+    preview1.title = "title2";
+    expect(details1.title).toBe("title2");
+    // make sure the log is called twice, the first for initial time and the second for changing preview1.title => detail1.title
+    expect(log.mock.calls).toEqual([["title1"], ["title2"]]);
+  });
+
+  test("untyped", () => {
+    const log = jest.fn();
+
+    const preview1 = model(
+      {
+        id: 1,
+        title: "title1",
+        thumbnail: "",
+      },
+      { ref: { title: "product.title" } }
+    );
+    const details1 = model(
+      {
+        id: 1,
+        title: "title1",
+        description: "",
+      },
+      { ref: { title: "product.title" } }
+    );
     effect(() => {
       log(details1.title);
     });

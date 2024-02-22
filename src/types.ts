@@ -230,6 +230,8 @@ export type ModelOptions<T> = {
    * @returns
    */
   save?: (model: T) => void;
+
+  ref?: { [key in keyof T]?: any } & { key?: any };
 };
 
 export type ModelKey = string | number | {} | boolean;

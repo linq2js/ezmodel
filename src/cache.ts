@@ -54,6 +54,9 @@ export const createCache = () => {
 
   return {
     get<T>(key?: any, path?: any): CacheItem<T> {
+      if (path && typeof key === "undefined") {
+        key = path;
+      }
       if (typeof key === "undefined" || key === null || !path) {
         return createItem(true);
       }

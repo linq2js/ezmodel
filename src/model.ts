@@ -48,22 +48,26 @@ export type StaleFn = {
   <T extends StateBase>(model: T, notify: boolean): void;
   <T extends StateBase>(
     model: T,
-    prop?: keyof NonFunctionProps<T>,
+    prop: keyof NonFunctionProps<T>,
     notify?: boolean
   ): void;
   <T extends StateBase>(
     model: T,
-    props?: (keyof NonFunctionProps<T>)[],
+    props: (keyof NonFunctionProps<T>)[],
     notify?: boolean
   ): void;
-  <T extends StateBase>(models: T[], notify?: boolean): void;
+  <T extends StateBase>(models: T[], notify: boolean): void;
+  <T extends StateBase>(models: T[]): void;
+  <T extends StateBase>(model: T): void;
 };
 
 export type RefreshFn = {
   (when: Listenable | Listenable<any>[]): void;
 
-  <T extends StateBase>(model: T, prop?: keyof NonFunctionProps<T>): void;
+  <T extends StateBase>(model: T, prop: keyof NonFunctionProps<T>): void;
   <T extends StateBase>(model: T, props?: (keyof NonFunctionProps<T>)[]): void;
+  <T extends StateBase>(model: T): void;
+
   <T extends StateBase>(models: T[]): void;
 };
 
@@ -658,11 +662,9 @@ let modelUniqueId = 1;
 const createModel = <T extends StateBase>(
   kind: ModelKind,
   constructor: (proxy: T) => readonly [T, DescriptorMap],
-  options: ModelOptions<any> & {
-    ref?: { key: any; props: any };
-  } = {}
+  options: ModelOptions<any> = {}
 ): Model<T> => {
-  const { tags, rules, save, load, ref: link } = options;
+  const { tags, rules, save, load, ref } = options;
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
@@ -698,7 +700,7 @@ const createModel = <T extends StateBase>(
         const getValue = get ?? (() => getPersistedValue(prop, value));
 
         propInfo = createStateProp(
-          cache.get(link?.key, link?.props[prop]),
+          cache.get(ref?.key, ref?.[prop]),
           descriptors,
           getValue,
           isComputed,
@@ -726,7 +728,7 @@ const createModel = <T extends StateBase>(
       )!;
 
       propInfo = createStateProp(
-        cache.get(link?.key, link?.props[prop]),
+        cache.get(ref?.key, ref?.[prop as string]),
         descriptors,
         NOOP,
         false,
@@ -857,7 +859,7 @@ const createModel = <T extends StateBase>(
           }
 
           info = createStateProp(
-            cache.get(link?.key, link?.props[prop]),
+            cache.get(ref?.key, ref?.[prop]),
             descriptors,
             () => descriptor.value,
             false,
@@ -980,7 +982,6 @@ const createModel = <T extends StateBase>(
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;
-  ref?: { [key in keyof TState]?: any };
 };
 
 export const createType = <TState extends StateBase>(
@@ -1069,7 +1070,7 @@ export const createType = <TState extends StateBase>(
       },
       {
         ...options,
-        ref: { key, props: options?.ref ?? {} },
+        ref: { ...options?.ref, key },
       }
     );
 
