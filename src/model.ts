@@ -1083,6 +1083,19 @@ export const createType = <TState extends StateBase>(
 
       return model;
     },
+    from(value: any) {
+      if (isPromiseLike(value)) {
+        return async.map(value, (resolved) => {
+          if (Array.isArray(resolved)) return resolved.map(create);
+          return create(resolved as TState);
+        });
+      }
+      if (Array.isArray(value)) {
+        return value.map(create);
+      }
+
+      return create(value);
+    },
   });
 
   Object.defineProperties(modelType, {

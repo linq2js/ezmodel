@@ -247,4 +247,19 @@ export interface ModelType<TState extends StateBase, TExtra extends StateBase> {
   ): Model<TState & TExtra> | undefined;
   get(key: any): Model<TState & TExtra> | undefined;
   clear(): void;
+  /**
+   * create model from given value
+   * @param value
+   */
+  from<T>(
+    value: T
+  ): T extends readonly TState[]
+    ? Model<TState & TExtra>[]
+    : T extends Promise<readonly TState[]>
+    ? AsyncResult<Model<TState & TExtra>[]>
+    : T extends Promise<TState>
+    ? AsyncResult<Model<TState & TExtra>>
+    : T extends TState
+    ? Model<TState & TExtra>
+    : never;
 }
