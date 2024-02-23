@@ -11,6 +11,9 @@ export const useComputed = <T>(
   const unwatchRef = useRef<VoidFunction>();
   const prevRef = useRef<any>();
   const errorRef = useRef<any>();
+  const renderingRef = useRef(true);
+
+  renderingRef.current = true;
 
   if (errorRef.current) {
     const error = errorRef.current;
@@ -35,9 +38,13 @@ export const useComputed = <T>(
           rerender();
         }
       } catch (ex) {
-        errorRef.current = ex;
         unwatchRef.current?.();
-        rerender();
+        if (renderingRef.current) {
+          throw ex;
+        } else {
+          errorRef.current = ex;
+          rerender();
+        }
       }
     });
   };
@@ -54,6 +61,8 @@ export const useComputed = <T>(
       unwatchRef.current = undefined;
     };
   }, []);
+
+  renderingRef.current = false;
 
   return prevRef.current;
 };
