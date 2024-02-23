@@ -15,12 +15,6 @@ export const useComputed = <T>(
 
   renderingRef.current = true;
 
-  if (errorRef.current) {
-    const error = errorRef.current;
-    errorRef.current = undefined;
-    throw error;
-  }
-
   const handleEffect = (force?: boolean) => {
     if (!force && unwatchRef.current) {
       return;
@@ -39,10 +33,8 @@ export const useComputed = <T>(
         }
       } catch (ex) {
         unwatchRef.current?.();
-        if (renderingRef.current) {
-          throw ex;
-        } else {
-          errorRef.current = ex;
+        errorRef.current = ex;
+        if (!renderingRef.current) {
           rerender();
         }
       }
@@ -63,6 +55,12 @@ export const useComputed = <T>(
   }, []);
 
   renderingRef.current = false;
+
+  if (errorRef.current) {
+    const error = errorRef.current;
+    errorRef.current = undefined;
+    throw error;
+  }
 
   return prevRef.current;
 };
