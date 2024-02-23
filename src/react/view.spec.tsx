@@ -1,9 +1,10 @@
 import { Suspense, useState } from "react";
 import { delay, wait } from "../async";
 import { effect } from "../effect";
-import { model } from "../model";
+import { model, refresh } from "../model";
 import { view } from "./view";
 import { act, fireEvent, render } from "@testing-library/react";
+import { rx } from "./rx";
 
 const LOADING = <div>loading</div>;
 
@@ -154,5 +155,35 @@ describe("view", () => {
       ["dispose effect"],
       ["dispose model"],
     ]);
+  });
+
+  test("rx with Suspense", async () => {
+    const app = model({
+      get data() {
+        return Promise.resolve(1);
+      },
+      reload() {
+        refresh(this, "data");
+      },
+    });
+    const App = view(() => {
+      return (
+        <Suspense fallback={LOADING}>
+          {rx(() => (
+            <>{wait(app.data)}</>
+          ))}
+        </Suspense>
+      );
+    });
+
+    const { getByText } = render(<App />);
+    getByText("loading");
+    await act(() => delay());
+    act(() => {
+      app.reload();
+    });
+    getByText("loading");
+    await act(() => delay());
+    getByText("1");
   });
 });

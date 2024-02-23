@@ -10,19 +10,33 @@ export const useComputed = <T>(
   const rerender = useRerender();
   const unwatchRef = useRef<VoidFunction>();
   const prevRef = useRef<any>();
+  const errorRef = useRef<any>();
+
+  if (errorRef.current) {
+    const error = errorRef.current;
+    errorRef.current = undefined;
+    throw error;
+  }
+
   const handleEffect = (force?: boolean) => {
     if (!force && unwatchRef.current) {
       return;
     }
     unwatchRef.current?.();
     unwatchRef.current = effect(({ count }) => {
-      const next = fn();
-      const isFirstRun = !count;
-      // change prev result to next result at first time or if it does not equal to next result
-      if (isFirstRun) {
-        prevRef.current = next;
-      } else if (!equal(prevRef.current, next)) {
-        prevRef.current = next;
+      try {
+        const next = fn();
+        const isFirstRun = !count;
+        // change prev result to next result at first time or if it does not equal to next result
+        if (isFirstRun) {
+          prevRef.current = next;
+        } else if (!equal(prevRef.current, next)) {
+          prevRef.current = next;
+          rerender();
+        }
+      } catch (ex) {
+        errorRef.current = ex;
+        unwatchRef.current?.();
         rerender();
       }
     });
