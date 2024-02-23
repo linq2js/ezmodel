@@ -73,7 +73,7 @@ export default defineConfig({
         typescript({
           sourceMap: false,
           declaration: true,
-          exclude: ["**/*.spec.*"],
+          exclude: ["**/*.spec.*", "./dist/**/*"],
           outDir: "dist",
         }),
       ],
