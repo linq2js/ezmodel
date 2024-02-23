@@ -1,16 +1,19 @@
-import { ReactElement, createElement, memo } from "react";
-import { AnyFunc, Equal, NoInfer } from "../types";
-import { useComputed } from "./useComputed";
+import { ReactElement, createElement, memo, useRef } from "react";
+import { AnyFunc } from "../types";
+import { trackable } from "..";
+import { useRerender } from "./useRerender";
 
-/**
- * there are 2 characteristics of rx()
- * 1. rx(stateFn) => the Part should not re-render even its parent component re-renders because stateFn is constant
- * 2. rx(customFn) => the Part should re-render to ensure the function result is up to date
- */
-const Part = memo((props: { fn: AnyFunc; equal?: Equal }) => {
-  return useComputed(props.fn, props.equal);
+const Part = memo((props: { fn: AnyFunc }) => {
+  const rerender = useRerender();
+  const untrackRef = useRef<VoidFunction>();
+
+  untrackRef.current?.();
+  const [{ track }, result] = trackable(props.fn);
+  untrackRef.current = track(rerender);
+
+  return result;
 });
 
-export const rx = <T>(fn: () => T, equal?: Equal<NoInfer<T>>): ReactElement => {
-  return createElement(Part, { fn, equal });
+export const rx = <T>(fn: () => T): ReactElement => {
+  return createElement(Part, { fn });
 };
