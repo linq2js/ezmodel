@@ -1,5 +1,5 @@
 import { Suspense, useState } from "react";
-import { delay, wait } from "../async";
+import { async, delay, wait } from "../async";
 import { effect } from "../effect";
 import { model, refresh } from "../model";
 import { view } from "./view";
@@ -158,20 +158,25 @@ describe("view", () => {
   });
 
   test("rx with Suspense", async () => {
+    const values = [1, 2];
+    let rerender = 0;
     const app = model({
       get data() {
-        return Promise.resolve(1);
+        return Promise.resolve(values.shift());
       },
       reload() {
         refresh(this, "data");
       },
     });
+
     const App = view(() => {
+      rerender++;
       return (
         <Suspense fallback={LOADING}>
-          {rx(() => (
-            <>{wait(app.data)}</>
-          ))}
+          {rx(() => {
+            const data = wait(app.data);
+            return <>{data}</>;
+          })}
         </Suspense>
       );
     });
@@ -179,11 +184,13 @@ describe("view", () => {
     const { getByText } = render(<App />);
     getByText("loading");
     await act(() => delay());
+    getByText("1");
     act(() => {
       app.reload();
     });
     getByText("loading");
     await act(() => delay());
-    getByText("1");
+    getByText("2");
+    expect(rerender).toBe(1);
   });
 });

@@ -338,6 +338,8 @@ export const all: AllFn = (
 export const wait: WaitFn = (awaitable: any) => {
   const resolveItem = (item: ResolvedData) => {
     if (item.promise) {
+      trackable()?.add(item.promise);
+
       throw item.promise;
     }
 
@@ -405,12 +407,9 @@ const asyncResultProps = <T = any>(
   initialData: any,
   initialError: any
 ): AsyncResult<T> => {
-  if (ASYNC_RESULT_PROP in promise) {
+  if ((promise as any)[ASYNC_RESULT_PROP]) {
     return promise as unknown as AsyncResult<T>;
   }
-  let loading = initialLoading;
-  let error = initialError;
-  let data = initialData;
 
   if (typeof (promise as any).cancel !== "function") {
     (promise as any).cancel = NOOP;
@@ -418,8 +417,11 @@ const asyncResultProps = <T = any>(
 
   const ar = Object.assign(promise, {
     [ASYNC_RESULT_PROP]: true,
+    loading: initialLoading,
+    error: initialError,
+    data: initialData,
     on(listener: AnyFunc) {
-      if (!loading) return NOOP;
+      if (!ar.loading) return NOOP;
 
       let active = true;
       promise.finally(() => {
@@ -435,33 +437,15 @@ const asyncResultProps = <T = any>(
     },
   });
 
-  Object.defineProperties(ar, {
-    loading: {
-      get() {
-        return loading;
-      },
-    },
-    error: {
-      get() {
-        return error;
-      },
-    },
-    data: {
-      get() {
-        return data;
-      },
-    },
-  });
-
-  if (loading) {
+  if (ar.loading) {
     ar.then(
       (result) => {
-        data = result;
-        loading = false;
+        ar.data = result;
+        ar.loading = false;
       },
       (e) => {
-        error = e;
-        loading = false;
+        ar.error = e;
+        ar.loading = false;
       }
     );
   }
