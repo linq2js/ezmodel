@@ -287,7 +287,7 @@ export interface ModelType<
    */
   get(
     key: ModelKey,
-    loader: (key: ModelKey) => TState | Promise<TState>,
+    loader: (key: any) => TState | Promise<TState>,
     staleWhileRevalidate?: boolean
   ): AsyncResult<Model<TState & TExtra>>;
 
