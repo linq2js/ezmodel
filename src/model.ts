@@ -1182,10 +1182,16 @@ export const createType = <TState extends StateBase>(
     clear() {
       models.clear();
     },
-    get(key: any, loader?: AnyFunc, cacheAndLoader?: boolean): any {
+    get(key: any, loader?: unknown, staleWhileRevalidate?: boolean): any {
+      // OVERLOAD: get(key, defaultState)
+      if (loader && typeof loader === "object") {
+        const cached = models.get(key);
+        return cached ?? create(loader as TState);
+      }
+
       // OVERLOAD: get(key, loader, cacheFirst)
-      if (loader) {
-        if (!cacheAndLoader) {
+      if (typeof loader === "function") {
+        if (!staleWhileRevalidate) {
           const cached = models.get(key);
           if (cached) return async(cached);
           return async.map(loader(key), create);
