@@ -353,6 +353,13 @@ const createStateProp = <T>(
     refresh() {
       // Refreshing is unnecessary if the property is being computed.
       if (isComputing) return;
+      if (cacheItem.current && "value" in cacheItem.current) {
+        if (isPromiseLike(cacheItem.current)) {
+          const ar = async(cacheItem.current);
+          // should not do refreshing if the state is loading
+          if (ar.loading) return;
+        }
+      }
       recompute();
       onChange.emit();
     },
