@@ -282,13 +282,13 @@ export interface ModelType<
    * Retrieve the model from the cache; if the model is not available in the cache, invoke the loader to obtain it.
    * @param key
    * @param loader
-   * @param cacheFirst By default, `cacheFirst` is set to `true`. If `cacheFirst` is set to `false`, initiate the loader to fetch the latest model and return the existing model from the cache. If the model is not present in the cache, wait for the loader's result to be fulfilled.
+   * @param If `cacheAndLoader` is set to `true`, initiate the loader to fetch the latest model and return the existing model from the cache. If the model is not present in the cache, wait for the loader's result to be fulfilled.
    *
    */
   get(
     key: ModelKey,
     loader: (key: ModelKey) => TState | Promise<TState>,
-    cacheFirst?: boolean
+    cacheAndLoader?: boolean
   ): AsyncResult<Model<TState & TExtra>>;
 
   /**

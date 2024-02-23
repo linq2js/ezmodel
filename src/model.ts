@@ -1182,12 +1182,13 @@ export const createType = <TState extends StateBase>(
     clear() {
       models.clear();
     },
-    get(key: any, loader?: AnyFunc, cacheFirst: boolean = true): any {
+    get(key: any, loader?: AnyFunc, cacheAndLoader?: boolean): any {
+      // OVERLOAD: get(key, loader, cacheFirst)
       if (loader) {
-        if (cacheFirst) {
+        if (!cacheAndLoader) {
           const cached = models.get(key);
           if (cached) return async(cached);
-          return async(loader(key));
+          return async.map(loader(key), create);
         }
 
         // execute loader then update latest
@@ -1199,7 +1200,7 @@ export const createType = <TState extends StateBase>(
 
         const cached = models.get(key);
         if (!cached) {
-          return async(result.then(create));
+          return async.map(result, create);
         }
 
         // update model later
@@ -1207,6 +1208,7 @@ export const createType = <TState extends StateBase>(
 
         return async(cached);
       }
+
       return models.get(key);
     },
     alter(key: any, propsOrRecipe: unknown): any {
