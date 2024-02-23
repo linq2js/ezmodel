@@ -462,7 +462,10 @@ export type AsyncFn = {
     asyncImport: () => Promise<T>
   ) => T extends AnyFunc ? T : T extends { default: infer F } ? F : never;
 
-  map<T, V>(value: V, mapper: (awaited: Awaited<V>, sync: boolean) => T): T;
+  map<T, V>(
+    value: V,
+    mapper: (awaited: Awaited<V>, sync: boolean) => Awaited<T>
+  ): V extends Promise<any> ? AsyncResult<T> : T;
 };
 
 const asyncResult = <T>(value: T | Promise<T>): AsyncResult<T> => {

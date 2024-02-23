@@ -4,6 +4,7 @@ import { dispose, refresh, stale, model, part } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
 import { effect } from "./effect";
+import { async, delay } from "./async";
 describe("basic usages", () => {
   test("Object.assign", () => {
     const m1 = model({ value: 1 });
@@ -567,11 +568,29 @@ describe("type", () => {
   });
 
   test("prevent changing key", () => {
-    const totoType = model.type<Todo>();
+    const todoType = model.type<Todo>();
 
-    const todo = totoType({ id: 1, title: "todo" });
+    const todo = todoType({ id: 1, title: "todo" });
     expect(() => ((todo as any).id = 2)).toThrow();
     expect(todo.id).toBe(1);
+  });
+
+  test("get with loader", async () => {
+    const todoType = model.type<Todo>();
+    todoType({ id: 1, title: "a" });
+    todoType({ id: 2, title: "a" });
+    const r1 = todoType.get(1, () => Promise.resolve({ id: 1, title: "b" }));
+    const r2 = todoType.get(
+      2,
+      () => Promise.resolve({ id: 2, title: "b" }),
+      false // The model will be updated upon the successful completion of the loader's operation.
+    );
+    expect(r1.data?.title).toBe("a");
+    expect(r2.data?.title).toBe("a");
+    await delay();
+    expect(r1.data?.title).toBe("a");
+    // The model title has been updated
+    expect(r2.data?.title).toBe("b");
   });
 });
 

@@ -294,7 +294,7 @@ const createStateProp = <T>(
         });
 
         return awaited;
-      });
+      }) as T;
     }
 
     // verify data duplication again
@@ -1182,16 +1182,46 @@ export const createType = <TState extends StateBase>(
     clear() {
       models.clear();
     },
-    get(key: any): any {
+    get(key: any, loader?: AnyFunc, cacheFirst: boolean = true): any {
+      if (loader) {
+        if (cacheFirst) {
+          return async(models.get(key)) ?? async(loader(key));
+        }
+
+        // execute loader then update latest
+        const result: Promise<TState> | TState = loader(key);
+        // result is model state
+        if (!isPromiseLike(result)) {
+          return async(create(result));
+        }
+
+        const cached = models.get(key);
+
+        if (!cached) {
+          return async(result.then(create));
+        }
+
+        // update model later
+        result.then(create);
+
+        return async(cached);
+      }
       return models.get(key);
     },
-    update(key: any, propsOrRecipe: unknown): any {
+    alter(key: any, propsOrRecipe: unknown): any {
       const updatedModels: Model<any>[] = [];
 
       if (typeof key === "function") {
         const filter = key;
         models.forEach((model) => {
           if (filter(model)) {
+            updatedModels.push(model);
+          }
+        });
+      } else if (Array.isArray(key)) {
+        key.forEach((k) => {
+          const model = models.get(k);
+          if (model) {
             updatedModels.push(model);
           }
         });
@@ -1206,7 +1236,7 @@ export const createType = <TState extends StateBase>(
         if (typeof propsOrRecipe === "function") {
           alter(() => propsOrRecipe(model));
         } else {
-          Object.assign(model, propsOrRecipe);
+          alter(model, propsOrRecipe as any);
         }
       });
 

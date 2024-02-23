@@ -3,7 +3,9 @@ import { local } from "./local";
 import { disposable } from "./disposable";
 import { NOOP, shallow } from "./utils";
 
-export type Effect = (context: EffectContext) => void | VoidFunction;
+export type Effect = (
+  context: EffectContext
+) => void | VoidFunction | Promise<void>;
 
 export type EffectRunHOF = (runEffect: VoidFunction) => VoidFunction;
 

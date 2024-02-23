@@ -1,21 +1,14 @@
 import { createDraft, current, finishDraft, produce } from "immer";
 
 import { isPromiseLike } from "./utils";
-import { AnyFunc, Dictionary, NoInfer } from "./types";
+import { AnyFunc, Dictionary, NoInfer, UpdateRecipe } from "./types";
 import { async } from "./async";
 import { propAccessor } from "./propAccessor";
 
 export type AlterFn = {
   <T>(fn: () => T): T;
 
-  <T>(
-    model: T,
-    props: NoInfer<{
-      [key in keyof T as T[key] extends AnyFunc ? never : key]?:
-        | (T[key] extends Promise<infer R> ? Promise<R> : T[key])
-        | ((draft: Awaited<T[key]>) => Awaited<T[key]> | void);
-    }>
-  ): T;
+  <T>(model: T, props: NoInfer<UpdateRecipe<T>>): T;
 };
 
 export type UpdateFn<T> = (value: T) => void;

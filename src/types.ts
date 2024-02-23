@@ -238,6 +238,12 @@ export type ModelOptions<T> = {
 
 export type ModelKey = string | number | {} | boolean;
 
+export type UpdateRecipe<T> = {
+  [key in keyof T as T[key] extends AnyFunc ? never : key]?:
+    | (T[key] extends Promise<infer R> ? Promise<R> : T[key])
+    | ((draft: Awaited<T[key]>) => Awaited<T[key]> | void);
+};
+
 export interface ModelType<
   TState extends StateBase,
   TExtra extends StateBase,
@@ -256,16 +262,46 @@ export interface ModelType<
   ): ModelType<TState, TExtra & T, TStrict>;
 
   init(initFn: (model: Model<TState & TExtra>) => void | VoidFunction): this;
+
   each(
     callback: (model: Model<TState & TExtra>) => void,
     filter?: (model: Model<TState & TExtra>) => boolean
   ): void;
-  update(
-    keyOrFilter: ModelKey | ((model: Model<TState & TExtra>) => boolean),
-    propsOrRecipe: Partial<TState> | ((draft: TState & TExtra) => void)
+
+  alter(
+    key: ModelKey | ModelKey[],
+    propsOrRecipe: UpdateRecipe<TState> | ((draft: TState & TExtra) => void)
   ): Model<TState & TExtra>[];
+
+  alter(
+    filter: (model: Model<TState & TExtra>) => boolean,
+    propsOrRecipe: UpdateRecipe<TState> | ((draft: TState & TExtra) => void)
+  ): Model<TState & TExtra>[];
+
+  /**
+   * Retrieve the model from the cache; if the model is not available in the cache, invoke the loader to obtain it.
+   * @param key
+   * @param loader
+   * @param cacheFirst By default, `cacheFirst` is set to `true`. If `cacheFirst` is set to `false`, initiate the loader to fetch the latest model and return the existing model from the cache. If the model is not present in the cache, wait for the loader's result to be fulfilled.
+   *
+   */
+  get(
+    key: ModelKey,
+    loader: (key: ModelKey) => TState | Promise<TState>,
+    cacheFirst?: boolean
+  ): AsyncResult<Model<TState & TExtra>>;
+
+  /**
+   * Retrieve the model from the cache using a specific key.
+   * @param key
+   */
   get(key: ModelKey): Model<TState & TExtra> | undefined;
+
+  /**
+   * Clear all models from the cache and execute disposal operations for each one.
+   */
   clear(): void;
+
   /**
    * create model from given value
    * @param value
