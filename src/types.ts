@@ -224,16 +224,14 @@ export type ModelOptions<T> = {
    * This method will be invoked to load model persisted data until the first property access of the model occurs.
    * @returns
    */
-  load?: () => {
-    [key in keyof T as T[key] extends AnyFunc ? never : key]?: T[key];
-  };
+  load?: () => StateBase | undefined;
 
   /**
    * This method will be called to save model data to persistent storage whenever model properties have been changed.
    * @param model
    * @returns
    */
-  save?: (model: T) => void;
+  save?: (model: StateBase) => void;
 
   ref?: { [key in keyof T]?: any } & { key?: any };
 };

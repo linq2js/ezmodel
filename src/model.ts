@@ -888,7 +888,7 @@ const createModel = <T extends StateBase>(
   };
   const getPersistedValue = (prop: string, defaultValue: any) => {
     if (!persistedValues) {
-      persistedValues = load ? load() : {};
+      persistedValues = load ? load() ?? {} : {};
     }
     if (!(prop in persistedValues)) {
       return defaultValue;
