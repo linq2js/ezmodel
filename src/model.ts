@@ -1144,7 +1144,7 @@ export const createType = <TState extends StateBase>(
         return [values, runtimeDescriptors];
       },
       {
-        ...options,
+        ...(options as any),
         ref: { ...options?.ref, key },
       }
     );
