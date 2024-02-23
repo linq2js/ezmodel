@@ -1,5 +1,5 @@
 import { Suspense, useState } from "react";
-import { async, delay, wait } from "../async";
+import { delay, wait } from "../async";
 import { effect } from "../effect";
 import { model, refresh } from "../model";
 import { view } from "./view";
