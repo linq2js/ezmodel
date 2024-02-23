@@ -40,6 +40,12 @@ export type AsyncResult<T = any> = Promise<T> &
   Loadable<T> &
   Listenable<void> & { cancel(): void };
 
+export type MaybeAsyncResult<T> = NonNullable<T> extends Promise<infer X>
+  ? T extends undefined
+    ? undefined | AsyncResult<X>
+    : AsyncResult<X>
+  : T;
+
 export type ImmutableType =
   | string
   | number
@@ -118,9 +124,7 @@ export type PublicProps<T> = Omit<
       ? never
       : key]: T[key] extends AnyFunc
       ? Action<T[key]>
-      : T[key] extends Promise<infer R>
-      ? AsyncResult<R>
-      : T[key];
+      : MaybeAsyncResult<T[key]>;
   },
   "init"
 >;
