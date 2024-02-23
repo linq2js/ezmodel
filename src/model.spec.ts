@@ -584,7 +584,7 @@ describe("type", () => {
     const r2 = todoType.get(
       2,
       () => Promise.resolve({ id: 2, title: "b" }),
-      false // The model will be updated upon the successful completion of the loader's operation.
+      true // The model will be updated upon the successful completion of the loader's operation.
     );
     expect(r1.data?.title).toBe("a");
     expect(r2.data?.title).toBe("a");
