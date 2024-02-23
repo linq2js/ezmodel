@@ -1185,7 +1185,9 @@ export const createType = <TState extends StateBase>(
     get(key: any, loader?: AnyFunc, cacheFirst: boolean = true): any {
       if (loader) {
         if (cacheFirst) {
-          return async(models.get(key)) ?? async(loader(key));
+          const cached = models.get(key);
+          if (cached) return async(cached);
+          return async(loader(key));
         }
 
         // execute loader then update latest
@@ -1196,7 +1198,6 @@ export const createType = <TState extends StateBase>(
         }
 
         const cached = models.get(key);
-
         if (!cached) {
           return async(result.then(create));
         }
