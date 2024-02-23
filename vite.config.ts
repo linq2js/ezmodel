@@ -66,17 +66,7 @@ export default defineConfig({
     },
     rollupOptions: {
       external: ["react", "react-dom", "@wry/equality"],
-      plugins: [
-        typescriptPaths({
-          preserveExtensions: true,
-        }),
-        typescript({
-          sourceMap: false,
-          declaration: true,
-          exclude: ["**/*.spec.*", "./dist/**/*"],
-          outDir: "dist",
-        }),
-      ],
+      plugins: [typescriptPaths({ preserveExtensions: true }), typescript()],
     },
   },
 });
