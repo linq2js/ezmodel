@@ -4,7 +4,8 @@ import { dispose, refresh, stale, model, part } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
 import { effect } from "./effect";
-import { async, delay } from "./async";
+import { delay } from "./async";
+
 describe("basic usages", () => {
   test("Object.assign", () => {
     const m1 = model({ value: 1 });
