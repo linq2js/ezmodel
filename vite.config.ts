@@ -58,6 +58,7 @@ export default defineConfig({
   },
   build: {
     manifest: true,
+    minify: false,
     reportCompressedSize: true,
     lib: {
       entry: entries,
