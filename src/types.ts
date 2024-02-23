@@ -340,3 +340,7 @@ export type ModelPart<TState, TPart, TVariant> = {
   part(state: TState, variant: TVariant): TPart;
   variant(value: TVariant): unknown;
 };
+
+export type AnyModel = Model<StateBase>;
+
+export type { StateBase } from "./internal";
