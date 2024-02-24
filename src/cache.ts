@@ -3,6 +3,7 @@ import { NOOP } from "./utils";
 
 export type CacheItem<T> = {
   readonly current: T | undefined;
+  readonly version: unknown;
   previous: T | undefined;
   original: T | undefined;
   link(source: any, listener: VoidFunction): VoidFunction;
@@ -11,27 +12,37 @@ export type CacheItem<T> = {
 };
 
 const createItem = <T>(
-  noDispatch: boolean,
+  linkable: boolean,
   onNoLink?: VoidFunction
 ): CacheItem<T> => {
   let current: any;
+  let version = {};
   const onChange = emitter<any>();
 
   return {
     get current() {
       return current;
     },
+    get version() {
+      return version;
+    },
     update(source, value) {
       const changed = value !== current;
       current = value;
-      if (changed && !noDispatch) {
-        onChange.emit(source);
+
+      if (changed) {
+        version = {};
+
+        if (linkable) {
+          onChange.emit(source);
+        }
       }
     },
     original: undefined,
     previous: undefined,
     link(source, changeListener) {
-      if (noDispatch) return NOOP;
+      if (!linkable) return NOOP;
+
       const unsubscribe = onChange.on((target) => {
         if (target === source) return;
         changeListener();
@@ -58,7 +69,7 @@ export const createCache = () => {
         key = path;
       }
       if (typeof key === "undefined" || key === null || !path) {
-        return createItem(true);
+        return createItem(false);
       }
       let objectCache = objectCaches.get(key);
       if (!objectCache) {
@@ -68,7 +79,7 @@ export const createCache = () => {
       const localObjectCache = objectCache;
       let item = localObjectCache.get(path);
       if (!item) {
-        item = createItem(false, () => {
+        item = createItem(true, () => {
           // do cleanup if no link
           if (localObjectCache.get(path) === item) {
             localObjectCache.delete(path);

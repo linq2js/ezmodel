@@ -5,6 +5,7 @@ export * from "./scope";
 export * from "./trackable";
 export * from "./disposable";
 export * from "./cancellable";
+export * from "./reversible";
 export * from "./emitter";
 export * from "./propAccessor";
 export * from "./types";

@@ -9,8 +9,11 @@ import { propAccessor } from "../propAccessor";
 import { scope } from "../scope";
 import { trackable } from "../trackable";
 import { isPromiseLike } from "../utils";
+import { reversible } from "..";
 
 type EvaluateResult<T> = { value: T } | { error: any };
+
+export const REVERT = {};
 
 export const createModelProperty = <T>(
   cached: CacheItem<EvaluateResult<T>>,
@@ -51,7 +54,21 @@ export const createModelProperty = <T>(
     ) {
       return;
     }
+
+    const prev = { ...cached };
+
     cached.update(updater, current);
+
+    prev.version = cached.version;
+
+    reversible()?.add(() => {
+      // There have been changes since the last time.
+      if (prev.version !== cached.version) return;
+      cached.previous = prev.previous;
+      cached.original = prev.original;
+      cached.update(updater, prev.current);
+      onChange.emit();
+    });
   };
 
   const onDependencyChange = () => {
