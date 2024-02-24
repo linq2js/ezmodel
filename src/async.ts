@@ -5,6 +5,11 @@ import { trackable } from "./trackable";
 import { AnyFunc, AsyncResult, Dictionary, Loadable } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
+export type Defer<T> = AsyncResult<T> & {
+  resolve(value: T): void;
+  reject(reason: unknown): void;
+};
+
 export type Awaitable<T = any> =
   | (() => T | PromiseLike<T>)
   | PromiseLike<T>
@@ -164,7 +169,8 @@ export type AsyncChainFn = {
   ): AsyncResult<ChainResult<R8>>;
 };
 
-const ASYNC_RESULT_PROP = Symbol("asyncResult");
+const ASYNC_RESULT_PROP = Symbol("ezmodel.asyncResult");
+const DEFER_PROP = Symbol("ezmodel.defer");
 
 const resolveData = (key: any, value: any): ResolvedData => {
   if (isPromiseLike(value)) {
@@ -438,16 +444,20 @@ const asyncResultProps = <T = any>(
   });
 
   if (ar.loading) {
-    ar.then(
-      (result) => {
-        ar.data = result;
-        ar.loading = false;
-      },
-      (e) => {
-        ar.error = e;
-        ar.loading = false;
-      }
-    );
+    if ((ar as any)[DEFER_PROP]) {
+      // no need to handle success and error status, defer logic already handles
+    } else {
+      ar.then(
+        (result) => {
+          ar.data = result;
+          ar.loading = false;
+        },
+        (e) => {
+          ar.error = e;
+          ar.loading = false;
+        }
+      );
+    }
   }
 
   return ar as any;
@@ -466,6 +476,35 @@ export type AsyncFn = {
     value: V,
     mapper: (awaited: Awaited<V>, sync: boolean) => Awaited<T>
   ): V extends Promise<any> ? AsyncResult<T> : T;
+
+  defer: typeof createDefer;
+};
+
+export const createDefer = <T>(
+  fn?: (resolve: (value: T) => void, reject: (reason: unknown) => void) => void
+): Defer<T> => {
+  let resolve: AnyFunc | undefined;
+  let reject: AnyFunc | undefined;
+
+  const promise = new Promise<T>((...args: any[]) => {
+    [resolve, reject] = args;
+    fn?.(args[0], args[1]);
+  });
+
+  return async(
+    Object.assign(promise, {
+      defer: true,
+      [DEFER_PROP]: true,
+      resolve(data: T) {
+        Object.assign(promise, { loading: false, data });
+        resolve?.(data);
+      },
+      reject(error: unknown) {
+        Object.assign(promise, { loading: false, error });
+        reject?.(error);
+      },
+    })
+  ) as any;
 };
 
 const asyncResult = <T>(value: T | Promise<T>): AsyncResult<T> => {
@@ -532,6 +571,7 @@ export const async: AsyncFn = Object.assign(
         return p.then((x) => x(...args));
       }) as any;
     },
+    defer: createDefer,
   }
 );
 

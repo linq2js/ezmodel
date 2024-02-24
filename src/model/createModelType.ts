@@ -1,12 +1,14 @@
 import { alter } from "./alter";
-import { async } from "../async";
+import { Defer, async } from "../async";
 import { createModel } from "./createModel";
 import { getModelApi } from "../getModelApi";
 import { getOwnPropertyDescriptors } from "../getOwnPropertyDescriptors";
-import { objectKeyedMap } from "../objectKeyedMap";
+
 import {
   AnyFunc,
   Model,
+  ModelKey,
+  ModelLoader,
   ModelOptions,
   ModelType,
   NoInfer,
@@ -16,30 +18,37 @@ import { isPromiseLike } from "../utils";
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;
+  fetch?: ModelLoader<TState>;
 };
 
 export const createModelType = <TState extends StateBase>(
   options?: ModelTypeOptions<NoInfer<TState>>
 ) => {
-  const { key: keyProp = "id" } = options ?? {};
+  const { key: keyProp = "id", fetch: defaultFetch } = options ?? {};
   const extraPropsBuilders: any[] = [];
   const defaultInits = new Set<VoidFunction>();
-  const models = objectKeyedMap<any, Model<any>>();
+  const models = new Map<ModelKey, Model<any>>();
+  const lazyModels = new Map<ModelKey, Defer<any>>();
 
-  const create = (props: TState): any => {
+  const getKey = (props: any) => {
     const key = props[keyProp];
-    // make sure all getters invoked
-    const values = { ...props };
-
     if (!key) {
       throw new Error(`The typed model must have ${keyProp as string} prop`);
     }
-    const cached = models.get(key);
+    return key;
+  };
 
-    if (cached) {
+  const create = (props: TState): any => {
+    const key = getKey(props);
+    // make sure all getters invoked
+    const values = { ...props };
+    const cachedModel = models.get(key);
+
+    if (cachedModel) {
       delete values[keyProp];
-      getModelApi(cached)?.configure(values, "all");
-      return cached;
+      getModelApi(cachedModel)?.configure(values, "all");
+      lazyResolve(key, cachedModel);
+      return cachedModel;
     }
 
     Object.defineProperty(values, keyProp, {
@@ -109,121 +118,190 @@ export const createModelType = <TState extends StateBase>(
     );
 
     models.set(key, newModel);
+    lazyResolve(key, newModel);
 
     return newModel;
   };
 
-  const modelType: ModelType<TState, {}, false> = Object.assign(create, {
-    type: "modelType" as const,
-    size: 0,
-    with(input: any): any {
-      extraPropsBuilders.push(input);
-      return this;
-    },
-    strict() {
-      return modelType;
-    },
-    init(fn: AnyFunc): any {
-      defaultInits.add(fn);
-      return this;
-    },
-    each(callback: AnyFunc, filter?: AnyFunc): any {
-      if (filter) {
-        models.forEach((model) => {
-          if (filter(model)) {
-            callback(model);
-          }
-        });
-      } else {
-        models.forEach(callback);
-      }
-    },
-    clear() {
-      models.clear();
-    },
-    get(key: any, loader?: unknown, staleWhileRevalidate?: boolean): any {
-      // OVERLOAD: get(key, defaultState)
-      if (loader && typeof loader === "object") {
-        const cached = models.get(key);
-        return cached ?? create(loader as TState);
+  const lazyResolve = (key: ModelKey, model: Model<any>) => {
+    const lazyModel = lazyModels.get(key);
+
+    if (lazyModel) {
+      lazyModels.delete(key);
+      lazyModel.resolve(model);
+    }
+  };
+
+  const lazyFetch = (key: ModelKey, customFetch?: ModelLoader<any>) => {
+    const fetch = customFetch || defaultFetch;
+    if (!fetch) return;
+    const result = fetch?.(key);
+    if (isPromiseLike<TState>(result)) {
+      result.then(create, (_) => {
+        // TODO: handle error
+      });
+    } else {
+      create(result);
+    }
+  };
+
+  const modelType: ModelType<TState, {}, false> = Object.assign(
+    (props: TState | TState[]): any => {
+      if (Array.isArray(props)) {
+        return props.map(create);
       }
 
-      // OVERLOAD: get(key, loader, cacheFirst)
-      if (typeof loader === "function") {
-        if (!staleWhileRevalidate) {
+      return create(props);
+    },
+    {
+      type: "modelType" as const,
+      size: 0,
+      load(loader: () => Promise<TState | TState[]>) {
+        const result = loader();
+
+        if (!isPromiseLike<TState | TState[]>(result)) {
+          throw new Error("Loader must return promise object");
+        }
+
+        return async.map(result, (resolved) => {
+          if (Array.isArray(resolved)) return resolved.map(create);
+          return create(resolved);
+        });
+      },
+      with(input: any): any {
+        extraPropsBuilders.push(input);
+        return this;
+      },
+      strict() {
+        return modelType;
+      },
+      init(fn: AnyFunc): any {
+        defaultInits.add(fn);
+        return this;
+      },
+      each(callback: AnyFunc, filter?: AnyFunc): any {
+        if (filter) {
+          models.forEach((model) => {
+            if (filter(model)) {
+              callback(model);
+            }
+          });
+        } else {
+          models.forEach(callback);
+        }
+      },
+      clear() {
+        models.clear();
+      },
+      get(key: any, loader?: unknown, staleWhileRevalidate?: boolean): any {
+        // OVERLOAD: get(key, defaultState)
+        if (loader && typeof loader === "object") {
           const cached = models.get(key);
-          if (cached) return async(cached);
-          return async.map(loader(key), create);
+          return cached ?? create(loader as TState);
         }
 
-        // execute loader then update latest
-        const result: Promise<TState> | TState = loader(key);
-        // result is model state
-        if (!isPromiseLike(result)) {
-          return async(create(result));
-        }
-
-        const cached = models.get(key);
-        if (!cached) {
-          return async.map(result, create);
-        }
-
-        // update model later
-        result.then(create);
-
-        return async(cached);
-      }
-
-      return models.get(key);
-    },
-    alter(key: any, propsOrRecipe: unknown): any {
-      const updatedModels: Model<any>[] = [];
-
-      if (typeof key === "function") {
-        const filter = key;
-        models.forEach((model) => {
-          if (filter(model)) {
-            updatedModels.push(model);
+        // OVERLOAD: get(key, loader, cacheFirst)
+        if (typeof loader === "function") {
+          if (!staleWhileRevalidate) {
+            const cached = models.get(key);
+            if (cached) return async(cached);
+            return async.map(loader(key), create);
           }
-        });
-      } else if (Array.isArray(key)) {
-        key.forEach((k) => {
-          const model = models.get(k);
+
+          // execute loader then update latest
+          const result: Promise<TState> | TState = loader(key);
+          // result is model state
+          if (!isPromiseLike(result)) {
+            return async(create(result));
+          }
+
+          const cached = models.get(key);
+          if (!cached) {
+            return async.map(result, create);
+          }
+
+          // update model later
+          result.then(create);
+
+          return async(cached);
+        }
+
+        return models.get(key);
+      },
+      alter(key: any, propsOrRecipe: unknown): any {
+        const updatedModels: Model<any>[] = [];
+
+        if (typeof key === "function") {
+          const filter = key;
+          models.forEach((model) => {
+            if (filter(model)) {
+              updatedModels.push(model);
+            }
+          });
+        } else if (Array.isArray(key)) {
+          key.forEach((k) => {
+            const model = models.get(k);
+            if (model) {
+              updatedModels.push(model);
+            }
+          });
+        } else {
+          const model = models.get(key);
           if (model) {
             updatedModels.push(model);
           }
-        });
-      } else {
-        const model = models.get(key);
-        if (model) {
-          updatedModels.push(model);
         }
-      }
 
-      updatedModels.forEach((model) => {
-        if (typeof propsOrRecipe === "function") {
-          alter(() => propsOrRecipe(model));
-        } else {
-          alter(model, propsOrRecipe as any);
-        }
-      });
-
-      return updatedModels;
-    },
-    from(value: any) {
-      if (isPromiseLike(value)) {
-        return async.map(value, (resolved) => {
-          if (Array.isArray(resolved)) return resolved.map(create);
-          return create(resolved as TState);
+        updatedModels.forEach((model) => {
+          if (typeof propsOrRecipe === "function") {
+            alter(() => propsOrRecipe(model));
+          } else {
+            alter(model, propsOrRecipe as any);
+          }
         });
-      }
-      if (Array.isArray(value)) {
-        return value.map(create);
-      }
 
-      return create(value);
-    },
-  });
+        return updatedModels;
+      },
+      from(value: any) {
+        if (isPromiseLike(value)) {
+          return async.map(value, (resolved) => {
+            if (Array.isArray(resolved)) return resolved.map(create);
+            return create(resolved as TState);
+          });
+        }
+        if (Array.isArray(value)) {
+          return value.map(create);
+        }
+
+        return create(value);
+      },
+
+      lazy(input: any, customFetch?: AnyFunc): any {
+        if (typeof input === "undefined" || input === null) {
+          throw new Error("Model key or model props required");
+        }
+
+        // the input is default props
+        if (typeof input === "object") {
+          const model = create(input);
+          const key = getKey(input);
+          lazyFetch(key, customFetch);
+          return model;
+        }
+
+        const key = input;
+        let lazyModel = lazyModels.get(key);
+        if (!lazyModel) {
+          lazyModel = async.defer();
+          lazyModels.set(key, lazyModel);
+        }
+
+        lazyFetch(key, customFetch);
+
+        return lazyModel;
+      },
+    }
+  );
 
   Object.defineProperties(modelType, {
     size: { get: () => models.size },

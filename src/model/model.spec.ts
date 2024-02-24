@@ -693,3 +693,33 @@ describe("part", () => {
     expect(partOf(app, numberPart, 2)).toBe(4);
   });
 });
+
+describe("lazy type", () => {
+  type Todo = { id: number; title: string };
+  test("default loader", () => {
+    const todoType = model.type<Todo>({
+      fetch: (id) => ({ id, title: "default" }),
+    });
+
+    const l1 = todoType.lazy(1);
+    expect(l1.data?.title).toBe("default");
+  });
+
+  test("custom loader", () => {
+    const todoType = model.type<Todo>();
+
+    const l1 = todoType.lazy(1, () => ({ id: 1, title: "default" }));
+    expect(l1.data?.title).toBe("default");
+  });
+
+  test("no loader", async () => {
+    const todoType = model.type<Todo>();
+
+    const l1 = todoType.lazy(1);
+    expect(l1.loading).toBeTruthy();
+    const t = todoType({ id: 1, title: "loaded" });
+    await delay();
+    expect(t).toBe(await l1);
+    expect((await l1).title).toBe("loaded");
+  });
+});

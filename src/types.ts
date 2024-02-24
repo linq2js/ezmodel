@@ -244,6 +244,8 @@ export type UpdateRecipe<T> = {
     | ((draft: Awaited<T[key]>) => Awaited<T[key]> | void);
 };
 
+export type ModelLoader<T> = (key: any) => T | Promise<T>;
+
 export interface ModelType<
   TState extends StateBase,
   TExtra extends StateBase,
@@ -254,6 +256,22 @@ export interface ModelType<
   (props: TState): TStrict extends true
     ? Model<Readonly<TState & TExtra>>
     : Model<TState & TExtra>;
+
+  (props: TState[]): TStrict extends true
+    ? Model<Readonly<TState & TExtra>>[]
+    : Model<TState & TExtra>[];
+
+  load(
+    loader: () => Promise<TState[]>
+  ): TStrict extends true
+    ? AsyncResult<Model<Readonly<TState & TExtra>>[]>
+    : AsyncResult<Model<TState & TExtra>[]>;
+
+  load(
+    loader: () => Promise<TState>
+  ): TStrict extends true
+    ? AsyncResult<Model<Readonly<TState & TExtra>>>
+    : AsyncResult<Model<TState & TExtra>>;
 
   strict(): ModelType<TState, TExtra, true>;
 
@@ -319,6 +337,18 @@ export interface ModelType<
     : T extends TState
     ? Model<TState & TExtra>
     : never;
+
+  lazy(id: ModelKey): AsyncResult<Model<TState & TExtra>>;
+  lazy(
+    id: ModelKey,
+    loader: ModelLoader<TState>
+  ): AsyncResult<Model<TState & TExtra>>;
+
+  lazy(props: TState): AsyncResult<Model<TState & TExtra>>;
+  lazy(
+    props: TState,
+    loader: ModelLoader<TState>
+  ): AsyncResult<Model<TState & TExtra>>;
 }
 
 export namespace Infer {
