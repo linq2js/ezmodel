@@ -1,9 +1,9 @@
 import { alter } from "./alter";
-import { async } from "./async";
+import { async } from "../async";
 import { createModel } from "./createModel";
-import { getModelApi } from "./getModelApi";
-import { getOwnPropertyDescriptors } from "./getOwnPropertyDescriptors";
-import { objectKeyedMap } from "./objectKeyedMap";
+import { getModelApi } from "../getModelApi";
+import { getOwnPropertyDescriptors } from "../getOwnPropertyDescriptors";
+import { objectKeyedMap } from "../objectKeyedMap";
 import {
   AnyFunc,
   Model,
@@ -11,8 +11,8 @@ import {
   ModelType,
   NoInfer,
   StateBase,
-} from "./types";
-import { isPromiseLike } from "./utils";
+} from "../types";
+import { isPromiseLike } from "../utils";
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;

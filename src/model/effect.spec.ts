@@ -1,5 +1,5 @@
-import { model } from "./model";
-import { effect } from "./effect";
+import { model } from "..";
+import { effect } from "../model/effect";
 
 describe("effect", () => {
   test("dispose automatically", () => {

@@ -1,6 +1,6 @@
 import { Suspense, useState } from "react";
 import { delay, wait } from "../async";
-import { effect } from "../effect";
+import { effect } from "../model/effect";
 import { model, refresh } from "../model";
 import { view } from "./view";
 import { act, fireEvent, render } from "@testing-library/react";

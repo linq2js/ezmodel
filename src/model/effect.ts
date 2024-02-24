@@ -1,7 +1,7 @@
-import { trackable } from "./trackable";
-import { local } from "./local";
-import { disposable } from "./disposable";
-import { NOOP, shallow } from "./utils";
+import { trackable } from "../trackable";
+import { local } from "../local";
+import { disposable } from "../disposable";
+import { NOOP, shallow } from "../utils";
 
 export type Effect = (
   context: EffectContext

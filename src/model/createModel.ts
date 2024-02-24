@@ -1,10 +1,10 @@
-import { cache } from "./cache";
-import { createActionProp } from "./createActionProp";
+import { cache } from "../cache";
+import { createModelAction } from "./createModelAction";
 import { createProxy } from "./createProxy";
-import { createStateProp } from "./createStateProp";
-import { disposable } from "./disposable";
-import { emitter } from "./emitter";
-import { getModelApi } from "./getModelApi";
+import { createModelProperty } from "./createModelProperty";
+import { disposable } from "../disposable";
+import { emitter } from "../emitter";
+import { getModelApi } from "../getModelApi";
 import {
   DescriptorMap,
   MODEL_TYPE,
@@ -18,9 +18,9 @@ import {
   UndefinedProp,
   UnknownProp,
   Validator,
-} from "./internal";
-import { objectKeyedMap } from "./objectKeyedMap";
-import { trackable } from "./trackable";
+} from "../internal";
+import { objectKeyedMap } from "../objectKeyedMap";
+import { trackable } from "../trackable";
 import {
   Dictionary,
   Listenable,
@@ -28,8 +28,8 @@ import {
   ModelOptions,
   ModelPart,
   NonFunctionProps,
-} from "./types";
-import { NOOP, equal } from "./utils";
+} from "../types";
+import { NOOP, equal } from "../utils";
 
 export type DisposeFn = {
   <T extends StateBase>(models: T[]): void;
@@ -98,13 +98,13 @@ export const createModel = <T extends StateBase>(
         if (value[NO_WRAP]) {
           propInfo = { type: "unknown", get: () => value };
         } else {
-          propInfo = createActionProp(value, privateProxy);
+          propInfo = createModelAction(value, privateProxy);
         }
       } else {
         const isComputed = !!get;
         const getValue = get ?? (() => getPersistedValue(prop, value));
 
-        propInfo = createStateProp(
+        propInfo = createModelProperty(
           cache.get(ref?.key, ref?.[prop]),
           descriptors,
           getValue,
@@ -132,7 +132,7 @@ export const createModel = <T extends StateBase>(
         prop
       )!;
 
-      propInfo = createStateProp(
+      propInfo = createModelProperty(
         cache.get(ref?.key, ref?.[prop as string]),
         descriptors,
         NOOP,
@@ -327,7 +327,7 @@ export const createModel = <T extends StateBase>(
             return;
           }
 
-          info = createStateProp(
+          info = createModelProperty(
             cache.get(ref?.key, ref?.[prop]),
             descriptors,
             () => descriptor.value,

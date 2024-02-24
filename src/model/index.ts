@@ -1,7 +1,7 @@
 import { createModelFactory } from "./createModelFactory";
 import { CreateModelPartFn, createModelPart } from "./createModelPart";
 import { createModelType } from "./createModelType";
-import { NoInfer, Model, ModelOptions } from "./types";
+import { NoInfer, Model, ModelOptions } from "../types";
 
 export type ReadonlyModel<T> = Model<Readonly<T>>;
 
@@ -52,5 +52,8 @@ export const model: ModelFn = Object.assign(createModelFactory("normal"), {
   part: createModelPart,
 });
 
+// re-export
 export { partOf } from "./createModelPart";
 export { dispose, stale, refresh } from "./createModel";
+export { alter } from "./alter";
+export { effect } from "./effect";

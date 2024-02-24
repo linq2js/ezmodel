@@ -1,5 +1,4 @@
-import { effect } from "./effect";
-import { model } from "./model";
+import { effect, model } from "./model";
 import { tag } from "./tag";
 
 describe("tag", () => {

@@ -1,10 +1,10 @@
 import { alter } from "./alter";
-import { filter, on } from "./emitter";
+import { filter, on } from "../emitter";
 import { z } from "zod";
-import { previous, original, peek } from "./propAccessor";
+import { previous, original, peek } from "../propAccessor";
 import { effect } from "./effect";
-import { delay } from "./async";
-import { model, dispose, refresh, stale, partOf } from "./model";
+import { delay } from "../async";
+import { model, dispose, refresh, stale, partOf } from ".";
 
 describe("basic usages", () => {
   test("Object.assign", () => {

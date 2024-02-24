@@ -1,18 +1,18 @@
 import { getValue, setValue } from "./alter";
-import { async } from "./async";
-import { CacheItem } from "./cache";
-import { cancellable } from "./cancellable";
+import { async } from "../async";
+import { CacheItem } from "../cache";
+import { cancellable } from "../cancellable";
 import { createProxy } from "./createProxy";
-import { emitter } from "./emitter";
-import { DescriptorMap, PropGetter, StateProp, Validator } from "./internal";
-import { propAccessor } from "./propAccessor";
-import { scope } from "./scope";
-import { trackable } from "./trackable";
-import { isPromiseLike } from "./utils";
+import { emitter } from "../emitter";
+import { DescriptorMap, PropGetter, StateProp, Validator } from "../internal";
+import { propAccessor } from "../propAccessor";
+import { scope } from "../scope";
+import { trackable } from "../trackable";
+import { isPromiseLike } from "../utils";
 
 type EvaluateResult<T> = { value: T } | { error: any };
 
-export const createStateProp = <T>(
+export const createModelProperty = <T>(
   cached: CacheItem<EvaluateResult<T>>,
   descriptors: DescriptorMap,
   getState: () => T,

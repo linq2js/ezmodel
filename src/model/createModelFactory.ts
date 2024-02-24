@@ -1,10 +1,10 @@
 import { createModel, dispose } from "./createModel";
-import { getModelApi } from "./getModelApi";
-import { getOwnPropertyDescriptors } from "./getOwnPropertyDescriptors";
-import { ModelKind } from "./internal";
-import { local } from "./local";
-import { AnyFunc, Dictionary, ModelOptions } from "./types";
-import { isClass } from "./utils";
+import { getModelApi } from "../getModelApi";
+import { getOwnPropertyDescriptors } from "../getOwnPropertyDescriptors";
+import { ModelKind } from "../internal";
+import { local } from "../local";
+import { AnyFunc, Dictionary, ModelOptions } from "../types";
+import { isClass } from "../utils";
 
 export const createModelFactory =
   (kind: ModelKind) =>

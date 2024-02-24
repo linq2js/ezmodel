@@ -1,7 +1,7 @@
-import { alter } from "./alter";
-import { async } from "./async";
-import { model, stale } from "./model";
-import { peek } from "./propAccessor";
+import { alter } from "../model/alter";
+import { async } from "../async";
+import { model, stale } from "..";
+import { peek } from "../propAccessor";
 
 describe("alter", () => {
   test("single model", () => {

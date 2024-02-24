@@ -1,11 +1,11 @@
-import { async } from "./async";
-import { emitter } from "./emitter";
-import { ActionProp } from "./internal";
-import { trackable } from "./trackable";
-import { AnyFunc, AsyncResult } from "./types";
-import { isPromiseLike } from "./utils";
+import { async } from "../async";
+import { emitter } from "../emitter";
+import { ActionProp } from "../internal";
+import { trackable } from "../trackable";
+import { AnyFunc, AsyncResult } from "../types";
+import { isPromiseLike } from "../utils";
 
-export const createActionProp = <T, A extends any[]>(
+export const createModelAction = <T, A extends any[]>(
   dispatch: (...args: A) => T,
   proxy: T
 ): ActionProp => {

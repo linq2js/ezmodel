@@ -1,5 +1,5 @@
-import { getModelApi } from "./getModelApi";
-import { ModelPart, NoInfer } from "./types";
+import { getModelApi } from "../getModelApi";
+import { ModelPart, NoInfer } from "../types";
 
 export type CreateModelPartFn = {
   <TPart, TState, TVariant>(

@@ -1,5 +1,5 @@
-import { DescriptorMap, PropGetter } from "./internal";
-import { Dictionary } from "./types";
+import { DescriptorMap, PropGetter } from "../internal";
+import { Dictionary } from "../types";
 
 export const createProxy = (
   descriptors: DescriptorMap,
