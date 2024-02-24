@@ -1,10 +1,10 @@
 import { alter } from "./alter";
 import { filter, on } from "./emitter";
-import { dispose, refresh, stale, model, part } from "./model";
 import { z } from "zod";
 import { previous, original, peek } from "./propAccessor";
 import { effect } from "./effect";
 import { delay } from "./async";
+import { model, dispose, refresh, stale, partOf } from "./model";
 
 describe("basic usages", () => {
   test("Object.assign", () => {
@@ -673,9 +673,9 @@ describe("part", () => {
     const values = [1, 2];
     const numberPart = model.part((_: { name: string }) => values.shift());
     const app = model({ name: "App" });
-    expect(part(app, numberPart)).toBe(1);
-    expect(part(app, numberPart)).toBe(1);
-    expect(part(app, numberPart)).toBe(1);
+    expect(partOf(app, numberPart)).toBe(1);
+    expect(partOf(app, numberPart)).toBe(1);
+    expect(partOf(app, numberPart)).toBe(1);
   });
 
   test("unnamed part with variant", () => {
@@ -684,12 +684,12 @@ describe("part", () => {
       (_: { name: string }, variant: number) => (values.shift() ?? 0) + variant
     );
     const app = model({ name: "App" });
-    expect(part(app, numberPart, 1)).toBe(2);
-    expect(part(app, numberPart, 1)).toBe(2);
-    expect(part(app, numberPart, 1)).toBe(2);
+    expect(partOf(app, numberPart, 1)).toBe(2);
+    expect(partOf(app, numberPart, 1)).toBe(2);
+    expect(partOf(app, numberPart, 1)).toBe(2);
 
-    expect(part(app, numberPart, 2)).toBe(4);
-    expect(part(app, numberPart, 2)).toBe(4);
-    expect(part(app, numberPart, 2)).toBe(4);
+    expect(partOf(app, numberPart, 2)).toBe(4);
+    expect(partOf(app, numberPart, 2)).toBe(4);
+    expect(partOf(app, numberPart, 2)).toBe(4);
   });
 });
