@@ -4,6 +4,7 @@ import {
   Listenable,
   ModelOptions,
   ModelPart,
+  ModelType,
 } from "./types";
 
 export type StateBase = Dictionary;
@@ -56,6 +57,7 @@ export type ModelApi = {
   rules: Dictionary<Validator | undefined>;
   configure(props: Dictionary, unstable?: Dictionary | "all"): void;
   options: ModelOptions<any>;
+  type: ModelType<any, any, any> | undefined;
   part(
     def: ModelPart<any, any, any>,
     name: string | undefined,

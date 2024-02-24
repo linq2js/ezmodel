@@ -27,6 +27,7 @@ import {
   Model,
   ModelOptions,
   ModelPart,
+  ModelType,
   NonFunctionProps,
 } from "../types";
 import { NOOP, equal } from "../utils";
@@ -67,9 +68,9 @@ let modelUniqueId = 1;
 export const createModel = <T extends StateBase>(
   kind: ModelKind,
   constructor: (proxy: T) => readonly [T, DescriptorMap],
-  options: ModelOptions<any> = {}
+  options: ModelOptions<any> & { type?: ModelType<any, any, any> } = {}
 ): Model<T> => {
-  const { tags, rules, save, load, ref } = options;
+  const { tags, rules, save, load, ref, type } = options;
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
@@ -376,6 +377,7 @@ export const createModel = <T extends StateBase>(
     kind,
     options,
     part: getPart,
+    type,
   };
   const apiProp: UnknownProp = {
     type: "unknown",
@@ -481,4 +483,9 @@ export const refresh: RefreshFn = (input: any, ...args: any[]) => {
 
 export const isModel = <T>(value: unknown): value is Model<T> => {
   return !!getModelApi(value);
+};
+
+export const isLoading = (value: Model<any>) => {
+  const api = getModelApi(value);
+  return !!api?.type?.isLoading(value);
 };

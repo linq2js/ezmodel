@@ -349,6 +349,7 @@ export interface ModelType<
     props: TState,
     loader: ModelLoader<TState>
   ): AsyncResult<Model<TState & TExtra>>;
+  isLoading(value: unknown): boolean;
 }
 
 export namespace Infer {

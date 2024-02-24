@@ -114,6 +114,7 @@ export const createModelType = <TState extends StateBase>(
       {
         ...(options as any),
         ref: { ...options?.ref, key },
+        type: modelType,
       }
     );
 
@@ -302,6 +303,19 @@ export const createModelType = <TState extends StateBase>(
         lazyFetch(key, customFetch);
 
         return lazyModel;
+      },
+      isLoading(model: unknown) {
+        if (!model) return false;
+
+        let key: ModelKey;
+
+        try {
+          key = getKey(model);
+        } catch (ex) {
+          return false;
+        }
+
+        return !!lazyModels.get(key);
       },
     }
   );
