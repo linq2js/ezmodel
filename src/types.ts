@@ -236,7 +236,7 @@ export type ModelOptions<T> = {
   ref?: { [key in keyof T]?: any } & { key?: any };
 };
 
-export type ModelKey = string | number | {} | boolean;
+export type ModelKey = string | number | boolean;
 
 export type UpdateRecipe<T> = {
   [key in keyof T as T[key] extends AnyFunc ? never : key]?:
@@ -344,7 +344,7 @@ export interface ModelType<
     loader: ModelLoader<TState>
   ): AsyncResult<Model<TState & TExtra>>;
 
-  lazy(props: TState): AsyncResult<Model<TState & TExtra>>;
+  lazy(props: TState): Model<TState & TExtra>;
   lazy(
     props: TState,
     loader: ModelLoader<TState>

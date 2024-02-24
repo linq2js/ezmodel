@@ -283,8 +283,11 @@ export const createModelType = <TState extends StateBase>(
 
         // the input is default props
         if (typeof input === "object") {
-          const model = create(input);
           const key = getKey(input);
+          let model = models.get(key);
+          if (!model) {
+            model = create(input);
+          }
           lazyFetch(key, customFetch);
           return model;
         }
