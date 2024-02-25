@@ -286,9 +286,11 @@ export const createModelType = <TState extends StateBase>(
         if (typeof input === "object") {
           const key = getKey(input);
           let model = models.get(key);
-          if (!model) {
-            model = create(input);
+          if (model) {
+            return model;
           }
+          // create temp model and do fetching
+          model = create(input);
           lazyFetch(key, customFetch);
           return model;
         }
