@@ -143,19 +143,31 @@ export const raw = <T>(value: T): T => {
 
 export const remap = <
   TSource extends {},
-  TMap extends Record<string, keyof TSource>,
+  TMap extends Record<string, keyof TSource | 1 | true>,
   TExtra extends {} = {}
 >(
   source: TSource,
   map: TMap,
   extra?: TExtra
-): TExtra & { [key in keyof TMap]: TSource[TMap[key]] } => {
+): TExtra & {
+  [key in keyof TMap]: TMap[key] extends true | 1
+    ? key extends keyof TSource
+      ? TSource[key]
+      : never
+    : TMap[key] extends keyof TSource
+    ? TSource[TMap[key]]
+    : never;
+} => {
   const descriptors: DescriptorMap = extra
     ? getOwnPropertyDescriptors(extra)
     : {};
 
   Object.entries(map).forEach(([destProp, sourceProp]) => {
-    descriptors[destProp] = { get: () => source[sourceProp] };
+    if (typeof sourceProp !== "string") {
+      descriptors[destProp] = { get: () => source[destProp as keyof TSource] };
+    } else {
+      descriptors[destProp] = { get: () => source[sourceProp] };
+    }
   });
 
   return createObjectFromDescriptors(descriptors) as any;
