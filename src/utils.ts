@@ -1,5 +1,8 @@
 import { isDraft, original } from "immer";
 import { AnyFunc } from "./types";
+import { getOwnPropertyDescriptors } from "./getOwnPropertyDescriptors";
+import { copyObject, createObjectFromDescriptors } from "./createObject";
+import { DescriptorMap } from "./internal";
 
 export const NOOP = () => {
   //
@@ -147,9 +150,13 @@ export const remap = <
   map: TMap,
   extra?: TExtra
 ): TExtra & { [key in keyof TMap]: TSource[TMap[key]] } => {
-  const proxy = { ...extra };
+  const descriptors: DescriptorMap = extra
+    ? getOwnPropertyDescriptors(extra)
+    : {};
+
   Object.entries(map).forEach(([destProp, sourceProp]) => {
-    Object.defineProperty(proxy, destProp, { get: () => source[sourceProp] });
+    descriptors[destProp] = { get: () => source[sourceProp] };
   });
-  return proxy as any;
+
+  return createObjectFromDescriptors(descriptors) as any;
 };
