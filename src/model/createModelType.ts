@@ -18,7 +18,7 @@ import { isPromiseLike } from "../utils";
 
 export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   key?: keyof TState;
-  fetch?: ModelLoader<TState>;
+  fetch?: ModelLoader<TState | undefined>;
 };
 
 export const createModelType = <TState extends StateBase>(
@@ -133,16 +133,33 @@ export const createModelType = <TState extends StateBase>(
     }
   };
 
-  const lazyFetch = (key: ModelKey, customFetch?: ModelLoader<any>) => {
+  const lazyFetch = (
+    key: ModelKey,
+    customFetch?: ModelLoader<TState | undefined>
+  ): Model<any> | undefined => {
     const fetch = customFetch || defaultFetch;
     if (!fetch) return;
+
     const result = fetch?.(key);
     if (isPromiseLike<TState>(result)) {
-      result.then(create, (_) => {
-        // TODO: handle error
-      });
-    } else {
-      create(result);
+      const ar = async(result);
+      if (ar.loading) {
+        result.then(
+          (resolved: TState | undefined) => {
+            if (!resolved) return;
+            create(resolved);
+          },
+          (_) => {
+            // TODO: handle error
+          }
+        );
+      }
+
+      if (ar.data) {
+        return create(ar.data);
+      }
+    } else if (result) {
+      return create(result as TState);
     }
   };
 
@@ -289,10 +306,13 @@ export const createModelType = <TState extends StateBase>(
           if (model) {
             return model;
           }
-          // create temp model and do fetching
-          model = create(input);
-          lazyFetch(key, customFetch);
-          return model;
+
+          return (
+            // return resolved model if fetch function is sync
+            lazyFetch(key, customFetch) ??
+            // otherwise create temp model
+            create(input)
+          );
         }
 
         const key = input;
@@ -302,7 +322,11 @@ export const createModelType = <TState extends StateBase>(
           lazyModels.set(key, lazyModel);
         }
 
-        lazyFetch(key, customFetch);
+        const fetchedModel = lazyFetch(key, customFetch);
+        // return resolved model if fetch function is sync
+        if (fetchedModel) {
+          return async(fetchedModel);
+        }
 
         return lazyModel;
       },
