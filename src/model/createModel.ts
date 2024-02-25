@@ -70,7 +70,7 @@ export const createModel = <T extends StateBase>(
   constructor: (proxy: T) => readonly [T, DescriptorMap],
   options: ModelOptions<any> & { type?: ModelType<any, any, any> } = {}
 ): Model<T> => {
-  const { tags, rules, save, load, ref, type } = options;
+  const { tags, rules, save, load, ref, type, sanitize } = options;
   // a proxy with full permissions (read/write/access private properties)
   let privateProxy: any;
   let proxy: any;
@@ -285,6 +285,7 @@ export const createModel = <T extends StateBase>(
   const getPersistedValue = (prop: string, defaultValue: any) => {
     if (!persistedValues) {
       persistedValues = load ? load(privateProxy) ?? {} : {};
+      sanitize?.(persistedValues, privateProxy);
     }
     if (!(prop in persistedValues)) {
       return defaultValue;

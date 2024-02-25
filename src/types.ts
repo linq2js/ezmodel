@@ -234,6 +234,8 @@ export type ModelOptions<T> = {
   save?: (model: Model<T>) => void;
 
   ref?: { [key in keyof T]?: any } & { key?: any };
+
+  sanitize?: (data: Record<string, unknown>, model: NoInfer<Model<T>>) => void;
 };
 
 export type ModelKey = string | number | boolean;
