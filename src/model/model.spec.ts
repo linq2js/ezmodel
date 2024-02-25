@@ -148,6 +148,25 @@ describe("basic usages", () => {
     expect(counter.doubledCount).toBe(4);
   });
 
+  test("Modifying other properties while computing a property", () => {
+    const app = model.strict({
+      products: [] as number[],
+      next: 1,
+      get all() {
+        const newProducts = this.products.concat([this.next]);
+        this.products = newProducts;
+        return newProducts;
+      },
+      loadNext() {
+        this.next++;
+      },
+    });
+    app.all;
+    app.loadNext();
+    app.all;
+    app.loadNext();
+  });
+
   test("copy props", () => {
     const counter = model({
       count: 1,

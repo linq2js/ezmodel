@@ -109,6 +109,7 @@ export const createModel = <T extends StateBase>(
           cache.get(ref?.key, ref?.[prop]),
           descriptors,
           getValue,
+          setProp,
           isComputed,
           getProp,
           api.rules[prop],
@@ -137,8 +138,10 @@ export const createModel = <T extends StateBase>(
         cache.get(ref?.key, ref?.[prop as string]),
         descriptors,
         NOOP,
+        setProp,
         false,
         getProp,
+
         undefined,
         undefined,
         saveWrapper
@@ -333,6 +336,7 @@ export const createModel = <T extends StateBase>(
             cache.get(ref?.key, ref?.[prop]),
             descriptors,
             () => descriptor.value,
+            setProp,
             false,
             getProp,
             api.rules[prop],

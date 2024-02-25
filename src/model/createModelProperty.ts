@@ -4,7 +4,13 @@ import { CacheItem } from "../cache";
 import { cancellable } from "../cancellable";
 import { createProxy } from "./createProxy";
 import { emitter } from "../emitter";
-import { DescriptorMap, PropGetter, StateProp, Validator } from "../internal";
+import {
+  DescriptorMap,
+  PropGetter,
+  PropSetter,
+  StateProp,
+  Validator,
+} from "../internal";
 import { propAccessor } from "../propAccessor";
 import { scope } from "../scope";
 import { trackable } from "../trackable";
@@ -19,6 +25,7 @@ export const createModelProperty = <T>(
   cached: CacheItem<EvaluateResult<T>>,
   descriptors: DescriptorMap,
   getState: () => T,
+  setProp: PropSetter,
   computed: boolean,
   getProp: PropGetter,
   validate?: Validator,
@@ -106,7 +113,8 @@ export const createModelProperty = <T>(
             }
 
             return info;
-          }
+          },
+          setProp
         );
       }
 
