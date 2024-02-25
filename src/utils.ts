@@ -1,5 +1,5 @@
 import { isDraft, original } from "immer";
-import { AnyFunc } from "./types";
+import { AnyFunc, NoInfer } from "./types";
 import { getOwnPropertyDescriptors } from "./getOwnPropertyDescriptors";
 import { createObjectFromDescriptors } from "./createObject";
 import { DescriptorMap } from "./internal";
@@ -143,7 +143,10 @@ export const raw = <T>(value: T): T => {
 
 export const remap = <
   TSource extends {},
-  TMap extends Record<string, keyof TSource | 1 | true>,
+  TMap extends Record<
+    string,
+    keyof TSource | 1 | true | ((source: NoInfer<TSource>) => any)
+  >,
   TExtra extends {} = {}
 >(
   source: TSource,
@@ -154,6 +157,8 @@ export const remap = <
     ? key extends keyof TSource
       ? TSource[key]
       : never
+    : TMap[key] extends (source: NoInfer<TSource>) => infer R
+    ? R
     : TMap[key] extends keyof TSource
     ? TSource[TMap[key]]
     : never;
@@ -163,7 +168,9 @@ export const remap = <
     : {};
 
   Object.entries(map).forEach(([destProp, sourceProp]) => {
-    if (typeof sourceProp !== "string") {
+    if (typeof sourceProp === "function") {
+      descriptors[destProp] = { get: () => sourceProp(source) };
+    } else if (typeof sourceProp !== "string") {
       descriptors[destProp] = { get: () => source[destProp as keyof TSource] };
     } else {
       descriptors[destProp] = { get: () => source[sourceProp] };
