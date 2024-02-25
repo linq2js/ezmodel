@@ -141,39 +141,48 @@ export const raw = <T>(value: T): T => {
   return isDraft(value) ? (original(value) as T) : value;
 };
 
+/**
+ * Create a new object that includes properties matching a specified property map, along with an additional property. The new object respects all getters from the original object.
+ * @param original
+ * @param map
+ * @param additional
+ * @returns
+ */
 export const remap = <
-  TSource extends {},
+  TOriginal extends {},
   TMap extends Record<
     string,
-    keyof TSource | 1 | true | ((source: NoInfer<TSource>) => any)
+    keyof TOriginal | 1 | true | ((source: NoInfer<TOriginal>) => any)
   >,
-  TExtra extends {} = {}
+  TAdditional extends {} = {}
 >(
-  source: TSource,
+  original: TOriginal,
   map: TMap,
-  extra?: TExtra
-): TExtra & {
+  additional?: TAdditional
+): TAdditional & {
   [key in keyof TMap]: TMap[key] extends true | 1
-    ? key extends keyof TSource
-      ? TSource[key]
+    ? key extends keyof TOriginal
+      ? TOriginal[key]
       : never
-    : TMap[key] extends (source: NoInfer<TSource>) => infer R
+    : TMap[key] extends (source: NoInfer<TOriginal>) => infer R
     ? R
-    : TMap[key] extends keyof TSource
-    ? TSource[TMap[key]]
+    : TMap[key] extends keyof TOriginal
+    ? TOriginal[TMap[key]]
     : never;
 } => {
-  const descriptors: DescriptorMap = extra
-    ? getOwnPropertyDescriptors(extra)
+  const descriptors: DescriptorMap = additional
+    ? getOwnPropertyDescriptors(additional)
     : {};
 
   Object.entries(map).forEach(([destProp, sourceProp]) => {
     if (typeof sourceProp === "function") {
-      descriptors[destProp] = { get: () => sourceProp(source) };
+      descriptors[destProp] = { get: () => sourceProp(original) };
     } else if (typeof sourceProp !== "string") {
-      descriptors[destProp] = { get: () => source[destProp as keyof TSource] };
+      descriptors[destProp] = {
+        get: () => original[destProp as keyof TOriginal],
+      };
     } else {
-      descriptors[destProp] = { get: () => source[sourceProp] };
+      descriptors[destProp] = { get: () => original[sourceProp] };
     }
   });
 

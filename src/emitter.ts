@@ -1,3 +1,4 @@
+import { disposable } from "./disposable";
 import {
   Listenable,
   Equal,
@@ -135,11 +136,19 @@ export const on: OnFn = (
   listenables: Listenable | Listenable[],
   listener: Listener
 ): any => {
-  const cleanup = emitter();
+  const onCleanup = emitter();
   (Array.isArray(listenables) ? listenables : [listenables]).forEach(
     (listenable) => {
-      cleanup.on(listenable.on(listener));
+      onCleanup.on(listenable.on(listener));
     }
   );
-  return cleanup.emit;
+
+  const cleanup = () => {
+    onCleanup.emit();
+    onCleanup.clear();
+  };
+
+  disposable()?.add(cleanup);
+
+  return cleanup;
 };

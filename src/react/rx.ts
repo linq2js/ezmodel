@@ -43,6 +43,11 @@ const Part = memo(({ fn }: { fn: AnyFunc }): any => {
   return ref.result;
 });
 
+/**
+ * Return a React element designed to re-render when any reactive expression within the `fn` function changes, ensuring that these changes do not affect the parent component.
+ * @param fn
+ * @returns
+ */
 export const rx = <T>(fn: () => T): ReactElement => {
   return createElement(Part, { fn });
 };

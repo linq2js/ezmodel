@@ -6,8 +6,18 @@ import { async } from "../async";
 import { propAccessor } from "../propAccessor";
 
 export type AlterFn = {
+  /**
+   * Perform modifications on multiple models within the `fn` function, where all changes to the models are treated as drafts.
+   * After exiting the `fn`, these draft modifications to the models will be applied.
+   * Note: The alter function call cannot be nested.
+   */
   <T>(fn: () => T): T;
 
+  /**
+   * Modify a single model using a specified recipe. The recipe is a plain object with the same structure as the model.
+   * The values of the recipe's properties can either be new values for the model's properties or mutation functions that operate on a draft of the model's property values.
+   * Note: The alter function call cannot be nested.
+   */
   <T>(model: T, props: NoInfer<UpdateRecipe<T>>): T;
 };
 
@@ -15,12 +25,12 @@ export type UpdateFn<T> = (value: T) => void;
 
 type AlteringItem = { base: { value: any }; draft: { value: any } };
 
-let alteringItems: Map<UpdateFn<any>, AlteringItem> | undefined;
+let alteringContext: { items: Map<UpdateFn<any>, AlteringItem> } | undefined;
 
-export const isAltering = () => !!alteringItems;
+export const isAltering = () => !!alteringContext;
 
 const checkNestedAlterCall = () => {
-  if (alteringItems) {
+  if (alteringContext) {
     throw new Error("Nested alter() calls are not permitted");
   }
 };
@@ -69,14 +79,14 @@ export const alter: AlterFn = (...args: any[]) => {
   const fn: AnyFunc = args[0];
   const items = new Map<UpdateFn<any>, AlteringItem>();
   try {
-    alteringItems = items;
+    alteringContext = { items };
     const result = fn();
     if (isPromiseLike(result)) {
       throw new Error("alter() does not support async updating");
     }
     return result;
   } finally {
-    alteringItems = undefined;
+    alteringContext = undefined;
     try {
       items.forEach((item, update) => {
         const changed = finishDraft(item.draft);
@@ -95,12 +105,12 @@ export const getValue = <T>(
   value: T,
   onFallback?: VoidFunction
 ) => {
-  if (alteringItems) {
-    let item = alteringItems.get(update);
+  if (alteringContext) {
+    let item = alteringContext.items.get(update);
     if (!item) {
       const base = { value };
       item = { base, draft: createDraft(base) };
-      alteringItems.set(update, item);
+      alteringContext.items.set(update, item);
     }
 
     const accessorType = propAccessor()?.type;
@@ -125,8 +135,8 @@ export const setValue = <T>(
   value: T,
   onFallback?: VoidFunction
 ) => {
-  if (alteringItems) {
-    const item = alteringItems.get(update);
+  if (alteringContext) {
+    const item = alteringContext.items.get(update);
     if (item) {
       item.draft.value = value;
       return;

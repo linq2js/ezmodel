@@ -21,6 +21,11 @@ export type ModelTypeOptions<TState> = ModelOptions<TState> & {
   fetch?: ModelLoader<TState | undefined>;
 };
 
+/**
+ * The model type encapsulates all properties and methods across multiple model instances.
+ * @param options
+ * @returns
+ */
 export const createModelType = <TState extends StateBase>(
   options?: ModelTypeOptions<NoInfer<TState>>
 ) => {
