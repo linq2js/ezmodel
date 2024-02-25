@@ -3,3 +3,4 @@ export * from "./rx";
 export * from "./stable";
 export * from "./useRerender";
 export * from "./useStable";
+export * from "./useComputed";
