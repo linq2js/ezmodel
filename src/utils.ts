@@ -137,3 +137,19 @@ export const isClass = (func: unknown) => {
 export const raw = <T>(value: T): T => {
   return isDraft(value) ? (original(value) as T) : value;
 };
+
+export const remap = <
+  TSource extends {},
+  TMap extends Record<string, keyof TSource>,
+  TExtra extends {} = {}
+>(
+  source: TSource,
+  map: TMap,
+  extra?: TExtra
+): TExtra & { [key in keyof TMap]: TSource[TMap[key]] } => {
+  const proxy = { ...extra };
+  Object.entries(map).forEach(([destProp, sourceProp]) => {
+    Object.defineProperty(proxy, destProp, { get: () => source[sourceProp] });
+  });
+  return proxy as any;
+};

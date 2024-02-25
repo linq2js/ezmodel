@@ -9,3 +9,4 @@ export * from "./reversible";
 export * from "./emitter";
 export * from "./propAccessor";
 export * from "./types";
+export * from "./utils";
