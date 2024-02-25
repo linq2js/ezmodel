@@ -1,7 +1,7 @@
 import { isDraft, original } from "immer";
 import { AnyFunc } from "./types";
 import { getOwnPropertyDescriptors } from "./getOwnPropertyDescriptors";
-import { copyObject, createObjectFromDescriptors } from "./createObject";
+import { createObjectFromDescriptors } from "./createObject";
 import { DescriptorMap } from "./internal";
 
 export const NOOP = () => {
