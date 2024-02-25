@@ -1,33 +1,47 @@
 import { ReactElement, createElement, memo, useState } from "react";
-import { AnyFunc } from "../types";
+import { AnyFunc, Equal, NoInfer } from "../types";
 import { trackable } from "..";
 import { useRerender } from "./useRerender";
 import { NOOP } from "~/utils";
 
-const Part = memo(({ fn }: { fn: AnyFunc }): any => {
+/**
+ * @param fn
+ * @param equal
+ * @returns
+ */
+export const useComputed = <T>(
+  fn: () => T,
+  equal: Equal<NoInfer<T>> = Object.is
+): T => {
   const rerender = useRerender();
   const ref = useState(() => ({
     fn: NOOP as AnyFunc,
     untrack: NOOP,
     error: undefined as any,
+    hasResult: false,
     result: undefined as any,
   }))[0];
 
   if (ref.fn !== fn) {
     ref.untrack();
     ref.fn = fn;
-    let currentRererender = NOOP;
+    let tryRererender = NOOP;
     const handleChange = () => {
       try {
-        ref.result = fn();
+        const nextResult = fn();
+        if (ref.hasResult && equal(ref.result, nextResult)) {
+          return;
+        }
+        ref.result = nextResult;
+        ref.hasResult = true;
       } catch (ex) {
         ref.error = ex;
       }
-      currentRererender();
+      tryRererender();
     };
     const { track } = trackable(handleChange)[0];
     ref.untrack = track(() => {
-      currentRererender = rerender;
+      tryRererender = rerender;
       handleChange();
     });
   }
@@ -41,6 +55,10 @@ const Part = memo(({ fn }: { fn: AnyFunc }): any => {
   }
 
   return ref.result;
+};
+
+const Part = memo(({ fn }: { fn: AnyFunc }): any => {
+  return useComputed(fn);
 });
 
 /**

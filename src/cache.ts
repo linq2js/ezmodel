@@ -4,6 +4,7 @@ import { NOOP } from "./utils";
 export type CacheItem<T> = {
   readonly current: T | undefined;
   readonly version: unknown;
+  readonly dirty: boolean;
   previous: T | undefined;
   original: T | undefined;
   link(source: any, listener: VoidFunction): VoidFunction;
@@ -17,6 +18,7 @@ const createItem = <T>(
 ): CacheItem<T> => {
   let current: any;
   let version = {};
+  let dirty = false;
   const onChange = emitter<any>();
 
   return {
@@ -26,10 +28,13 @@ const createItem = <T>(
     get version() {
       return version;
     },
+    get dirty() {
+      return dirty;
+    },
     update(source, value) {
       const changed = value !== current;
       current = value;
-
+      dirty = true;
       if (changed) {
         version = {};
 

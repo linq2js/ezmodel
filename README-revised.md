@@ -49,8 +49,8 @@ const App = view(() => (
 
 ## Showcase
 
-<details>
-    <summary><strong>Defining model methods</strong></summary>
+<details open>
+<summary>Defining model methods</summary>
 
 Use object shorthand syntax to define model methods.
 
@@ -70,8 +70,8 @@ const app = model({
 
 </details>
 
-<details>
-    <summary><strong>Defining model computed properties</strong></summary>
+<details open>
+<summary>Defining model computed properties</summary>
 
 Computed properties are object properties that contain expressions with reactive dependencies on model properties or other computed properties. When any of these reactive dependencies are updated, the computed properties will automatically re-calculate. This implies that computed properties will be memoized, allowing for efficient subsequent access.
 
@@ -102,8 +102,8 @@ module3.factor++; // the module3.sum re-computes
 
 </details>
 
-<details>
-    <summary><strong>Using immutable data for mutating model</strong></summary>
+<details open>
+<summary>Using immutable data for mutating model</summary>
 
 Similar to other state management libraries, `ezmodel` enforces the use of immutable data when mutating model properties.
 
@@ -114,7 +114,7 @@ const app = model({
   todos: [],
 });
 
-// 🔴  DON'T
+// 🔴 DON'T
 app.todos.push({ title: "new todo" });
 
 // 🟢 DO
@@ -155,6 +155,84 @@ const app = model({
 
 </details>
 
+<details open>
+<summary>Defining validation rules for model</summary>
+`Ezmodel` supports validation rules that allow you to validate your model data according to your own criteria. While the following code may function in standard scenarios, implementing validation rules can enhance its effectiveness.
+
+```js
+import { model } from "ezmodel";
+
+const app = model({
+  count: 1,
+  setCount(value) {
+    if (isNaN(value)) {
+      throw new Error("Invalid count");
+    }
+  },
+});
+```
+
+The improved version of the code, which incorporates validation rules, appears more straightforward and reusable.
+
+```js
+import { model } from "ezmodel";
+
+const isNumber = (value) => {
+  if (isNaN(value)) {
+    throw new Error(`Expected number but got ${typeof value}`);
+  }
+};
+
+const app = model(
+  { count: 1 },
+  {
+    rules: {
+      count: isNumber,
+    },
+  }
+);
+
+app.count = "aaa"; // an error thrown `Expected number but got string`
+```
+
+You can also utilize third-party validation libraries to meet your requirements. Check the example below to demonstrate integration with `zod`.
+
+```js
+import { z } from "zod";
+import { model } from "ezmodel";
+
+const app = model(
+  { count: 1 },
+  {
+    rules: {
+      count: z.number(),
+    },
+  }
+);
+```
+
+`Ezmodel` also supports performing data transformation and validation together.
+
+```js
+import { z } from "zod";
+import { model } from "ezmodel";
+
+const app = model(
+  { count: 1 },
+  {
+    rules: {
+      count: z.coerce.number().min(1),
+    },
+  }
+);
+
+// try to assign string instead number and zod will convert the value to number and does validation
+app.count = "2";
+expect(app.count).toBe(2);
+```
+
+</details>
+
 ## Learn More
 
 - [API Reference](./docs/api-reference.md)
@@ -172,3 +250,11 @@ For questions, discussions, or contributions, please join our community:
 - **Contribute:** Contributions are welcome! If you're interested in contributing, please read our [CONTRIBUTING](https://github.com/linq2js/ezmodel/blob/main/CONTRIBUTING.md) guide for more information on how to get started.
 
 Stay connected and help improve `ezmodel` by sharing your feedback and ideas with the community!
+
+<style>
+    summary {
+        font-weight: 500;
+        font-size: 1.25em;
+        margin-bottom: 0.5rem;
+    }
+</style>
