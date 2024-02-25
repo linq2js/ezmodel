@@ -12,6 +12,12 @@ describe("basic usages", () => {
     const m2 = Object.assign(m1, { value: 2 });
     expect(m1).toBe(m2);
   });
+
+  test("in operator", () => {
+    const app = model({ description: "" });
+    expect("description" in app).toBeTruthy();
+  });
+
   test("getting value", () => {
     const counter = model({ count: 1 });
 

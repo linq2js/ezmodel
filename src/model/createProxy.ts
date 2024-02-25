@@ -47,6 +47,9 @@ export const createProxy = (
       }
       return descriptors[p];
     },
+    has(_, p) {
+      return p in descriptors;
+    },
     /**
      * this trick to prevent immer tries to make a copy of nested models
      * ```js
