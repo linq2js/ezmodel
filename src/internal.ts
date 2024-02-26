@@ -1,4 +1,6 @@
 import {
+  Action,
+  ActionMiddleware,
   AnyFunc,
   Dictionary,
   Listenable,
@@ -75,4 +77,6 @@ export type ModelApi = {
 
 export type DescriptorMap = Record<string, PropertyDescriptor>;
 
-export const PRIVATE_PROP_ERROR = "Cannot read private prop";
+export type InternalAction<T extends AnyFunc> = Action<T> & {
+  use(...middleware: ActionMiddleware[]): void;
+};

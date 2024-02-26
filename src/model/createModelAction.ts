@@ -1,8 +1,8 @@
 import { async } from "../async";
 import { emitter } from "../emitter";
-import { ActionProp } from "../internal";
+import { ActionProp, InternalAction } from "../internal";
 import { trackable } from "../trackable";
-import { AnyFunc, AsyncResult } from "../types";
+import { ActionMiddleware, AnyFunc, AsyncResult } from "../types";
 import { isPromiseLike } from "../utils";
 
 export const createModelAction = <T, A extends any[]>(
@@ -24,29 +24,39 @@ export const createModelAction = <T, A extends any[]>(
 
   const onChange = emitter();
   const onDispatch = emitter<A>();
+  let invoke = (...args: A) => {
+    onDispatch.emit(args);
+    current = { count: (current?.count ?? 0) + 1, args };
+    try {
+      current.result = dispatch.apply(proxy, args);
+      if (isPromiseLike(current.result)) {
+        current.result = async(current.result) as T;
+      }
+    } catch (ex) {
+      current.error = ex;
+    }
 
-  const action = Object.assign(
+    prevResult = current.result;
+
+    onChange.emit();
+    if (current.error) {
+      throw current.error;
+    }
+    return current.result;
+  };
+
+  const action: InternalAction<AnyFunc> = Object.assign(
     (...args: A) => {
-      onDispatch.emit(args);
-      current = { count: (current?.count ?? 0) + 1, args };
-      try {
-        current.result = dispatch.apply(proxy, args);
-        if (isPromiseLike(current.result)) {
-          current.result = async(current.result) as T;
-        }
-      } catch (ex) {
-        current.error = ex;
-      }
-
-      prevResult = current.result;
-
-      onChange.emit();
-      if (current.error) {
-        throw current.error;
-      }
-      return current.result;
+      return invoke(...args);
     },
     {
+      type: "action" as const,
+      prevResult: undefined,
+      called: 0,
+      loading: false,
+      awaited: undefined,
+      error: undefined,
+      result: undefined,
       on: onDispatch.on,
       reload() {
         if (!current) return false;
@@ -61,6 +71,11 @@ export const createModelAction = <T, A extends any[]>(
           return current.result;
         }
         return action(...args);
+      },
+      use(...middleware: ActionMiddleware[]) {
+        middleware.forEach((m) => {
+          invoke = m(invoke);
+        });
       },
     }
   );

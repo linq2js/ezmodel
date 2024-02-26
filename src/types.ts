@@ -60,6 +60,7 @@ export type ImmutableType =
 export type OnceOptions = { recent?: boolean };
 
 export type Action<T extends AnyFunc> = T & {
+  readonly type: "action";
   readonly called: number;
   readonly prevResult: ReturnType<T> | undefined;
   readonly result:
@@ -377,3 +378,5 @@ export type ModelPart<TState, TPart, TVariant> = {
 export type AnyModel = Model<StateBase>;
 
 export type { StateBase } from "./internal";
+
+export type ActionMiddleware = (action: AnyFunc) => AnyFunc;

@@ -57,3 +57,4 @@ export { partOf } from "./createModelPart";
 export { dispose, stale, refresh } from "./createModel";
 export { alter } from "./alter";
 export { effect } from "./effect";
+export * from "./middleware";
