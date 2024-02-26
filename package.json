@@ -36,7 +36,8 @@
   },
   "files": [
     "**",
-    "!jest_cache/"
+    "!jest_cache/",
+    "!.VSCodeCounter/"
   ],
   "exports": {
     ".": {

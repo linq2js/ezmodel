@@ -25,3 +25,4 @@ dist-ssr
 jest_cache
 react
 jest_cache/
+.VSCodeCounter/
