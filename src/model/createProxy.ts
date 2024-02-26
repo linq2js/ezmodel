@@ -39,7 +39,15 @@ export const createProxy = (
       return false;
     },
     ownKeys(_) {
-      return Object.keys(descriptors);
+      return Object.keys(descriptors)
+        .map((prop) => {
+          const type = getProp(prop).type;
+          if (type === "private" || type === "undefined") {
+            return "";
+          }
+          return prop;
+        })
+        .filter((x) => !!x);
     },
     getOwnPropertyDescriptor(_, p) {
       if (typeof p !== "string") {
@@ -48,7 +56,8 @@ export const createProxy = (
       return descriptors[p];
     },
     has(_, p) {
-      return p in descriptors;
+      const type = getProp(p).type;
+      return type !== "private" && type !== "undefined";
     },
     /**
      * this trick to prevent immer tries to make a copy of nested models

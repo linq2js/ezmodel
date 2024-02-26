@@ -11,6 +11,7 @@ import {
   ModelApi,
   ModelKind,
   NO_WRAP,
+  PrivateProp,
   Prop,
   PropGetter,
   PropSetter,
@@ -370,6 +371,12 @@ export const createModel = <T extends StateBase>(
   };
 
   const undefinedProp: UndefinedProp = { type: "undefined", get: NOOP };
+  const privateProp: PrivateProp = {
+    type: "private",
+    get() {
+      throw new Error("Private prop can be accessed inside model scope");
+    },
+  };
   const api: ModelApi = {
     id: modelUniqueId++,
     refresh,
@@ -422,7 +429,7 @@ export const createModel = <T extends StateBase>(
 
   const getPublicProp = (prop: string | symbol) => {
     if (typeof prop === "string" && prop[0] === "_") {
-      throw new Error("Cannot read private prop");
+      return privateProp;
     }
 
     return getProp(prop);

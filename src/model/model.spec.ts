@@ -14,8 +14,24 @@ describe("basic usages", () => {
   });
 
   test("in operator", () => {
-    const app = model({ description: "" });
+    const app = model({
+      description: "",
+      _privateProp: 1,
+      doSomething() {
+        expect("_privateProp" in this).toBeTruthy();
+      },
+    });
+    app.doSomething();
     expect("description" in app).toBeTruthy();
+    expect("_privateProp" in app).toBeFalsy();
+  });
+
+  test("get keys", () => {
+    const app = model({
+      description: "",
+      _privateProp: 1,
+    });
+    expect(Object.keys(app)).toEqual(["description"]);
   });
 
   test("getting value", () => {

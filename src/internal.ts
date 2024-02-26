@@ -32,8 +32,14 @@ export type ActionProp = UpdatableProp & {
 };
 export type UnknownProp = PropBase & { type: "unknown" };
 export type UndefinedProp = PropBase & { type: "undefined" };
+export type PrivateProp = PropBase & { type: "private" };
 
-export type Prop = StateProp | ActionProp | UnknownProp | UndefinedProp;
+export type Prop =
+  | StateProp
+  | ActionProp
+  | UnknownProp
+  | UndefinedProp
+  | PrivateProp;
 
 export type PropGetter = (prop: string | symbol) => Prop;
 export type PropSetter = (prop: string | symbol, value: any) => boolean;
@@ -66,3 +72,5 @@ export type ModelApi = {
 };
 
 export type DescriptorMap = Record<string, PropertyDescriptor>;
+
+export const PRIVATE_PROP_ERROR = "Cannot read private prop";
