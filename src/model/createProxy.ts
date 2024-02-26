@@ -2,6 +2,7 @@ import { DescriptorMap, PropGetter } from "../internal";
 import { Dictionary } from "../types";
 
 export const createProxy = (
+  isDynamic: boolean,
   descriptors: DescriptorMap,
   getProp: PropGetter,
   setProp?: (prop: string | symbol, value: any) => boolean
@@ -42,9 +43,14 @@ export const createProxy = (
       return Object.keys(descriptors)
         .map((prop) => {
           const type = getProp(prop).type;
-          if (type === "private" || type === "undefined") {
+          if (type === "private") {
             return "";
           }
+
+          if (type === "undefined" && !isDynamic) {
+            return "";
+          }
+
           return prop;
         })
         .filter((x) => !!x);

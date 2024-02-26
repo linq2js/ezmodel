@@ -32,6 +32,7 @@ import {
   NonFunctionProps,
 } from "../types";
 import { NOOP, equal } from "../utils";
+import { createModelField } from "./createModelField";
 
 export type DisposeFn = {
   <T extends StateBase>(models: T[]): void;
@@ -103,20 +104,26 @@ export const createModel = <T extends StateBase>(
           propInfo = createModelAction(value, privateProxy);
         }
       } else {
-        const isComputed = !!get;
         const getValue = get ?? (() => getPersistedValue(prop, value));
 
-        propInfo = createModelProperty(
-          cache.get(ref?.key, ref?.[prop]),
-          descriptors,
-          getValue,
-          setProp,
-          isComputed,
-          getProp,
-          api.rules[prop],
-          set?.bind(privateProxy),
-          saveWrapper
-        );
+        if (prop[0] == "_" && prop[1] === "_") {
+          propInfo = createModelField(getValue, saveWrapper);
+        } else {
+          const isComputed = !!get;
+
+          propInfo = createModelProperty(
+            kind === "dynamic",
+            cache.get(ref?.key, ref?.[prop]),
+            descriptors,
+            getValue,
+            setProp,
+            isComputed,
+            getProp,
+            api.rules[prop],
+            set?.bind(privateProxy),
+            saveWrapper
+          );
+        }
       }
 
       propInfoMap.set(prop, propInfo);
@@ -136,6 +143,7 @@ export const createModel = <T extends StateBase>(
       )!;
 
       propInfo = createModelProperty(
+        kind === "dynamic",
         cache.get(ref?.key, ref?.[prop as string]),
         descriptors,
         NOOP,
@@ -151,7 +159,7 @@ export const createModel = <T extends StateBase>(
       propInfoMap.set(prop as string, propInfo);
     }
 
-    if (propInfo && "type" in propInfo && propInfo.type === "state") {
+    if (propInfo && "set" in propInfo) {
       propInfo.set(value);
       return true;
     }
@@ -159,7 +167,7 @@ export const createModel = <T extends StateBase>(
     return false;
   };
 
-  privateProxy = createProxy(descriptors, getProp, setProp);
+  privateProxy = createProxy(kind === "dynamic", descriptors, getProp, setProp);
 
   const [{ dispose: factoryDispose }, [target, customDescriptors]] = disposable(
     () => constructor(privateProxy)
@@ -334,6 +342,7 @@ export const createModel = <T extends StateBase>(
           }
 
           info = createModelProperty(
+            kind === "dynamic",
             cache.get(ref?.key, ref?.[prop]),
             descriptors,
             () => descriptor.value,
@@ -454,8 +463,8 @@ export const createModel = <T extends StateBase>(
   proxy =
     kind === "strict"
       ? // strict proxy has no setters
-        createProxy(descriptors, getPublicProp)
-      : createProxy(descriptors, getPublicProp, setProp);
+        createProxy(false, descriptors, getPublicProp)
+      : createProxy(false, descriptors, getPublicProp, setProp);
 
   onDispose.on(initDispose);
 

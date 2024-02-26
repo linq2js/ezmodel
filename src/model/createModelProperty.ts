@@ -22,6 +22,7 @@ type EvaluateResult<T> = { value: T } | { error: any };
 export const REVERT = {};
 
 export const createModelProperty = <T>(
+  isDynamic: boolean,
   cached: CacheItem<EvaluateResult<T>>,
   descriptors: DescriptorMap,
   getState: () => T,
@@ -103,6 +104,7 @@ export const createModelProperty = <T>(
 
       if (!thisProxy) {
         thisProxy = createProxy(
+          isDynamic,
           descriptors,
           // custom get prop
           (prop) => {

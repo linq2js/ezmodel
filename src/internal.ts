@@ -31,6 +31,7 @@ export type ActionProp = UpdatableProp & {
   setDispatcher(dispatcher: AnyFunc): void;
 };
 export type UnknownProp = PropBase & { type: "unknown" };
+export type ValueProp = PropBase & { type: "value"; set(value: any): void };
 export type UndefinedProp = PropBase & { type: "undefined" };
 export type PrivateProp = PropBase & { type: "private" };
 
@@ -39,7 +40,8 @@ export type Prop =
   | ActionProp
   | UnknownProp
   | UndefinedProp
-  | PrivateProp;
+  | PrivateProp
+  | ValueProp;
 
 export type PropGetter = (prop: string | symbol) => Prop;
 export type PropSetter = (prop: string | symbol, value: any) => boolean;

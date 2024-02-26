@@ -217,6 +217,26 @@ describe("basic usages", () => {
     expect(() => (counter as any)._count).toThrow();
   });
 
+  test("field", () => {
+    const app = model({
+      // create a field
+      __field: 1,
+      get something() {
+        return this.__field * 2;
+      },
+      increment() {
+        this.__field++;
+      },
+    });
+
+    expect(app.something).toBe(2);
+    app.increment();
+    app.increment();
+    app.increment();
+    // the field has no reactive effect, so something prop will not recompute
+    expect(app.something).toBe(2);
+  });
+
   test("load model", () => {
     const log = jest.fn();
     const app = model(
