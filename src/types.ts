@@ -379,4 +379,6 @@ export type AnyModel = Model<StateBase>;
 
 export type { StateBase } from "./internal";
 
-export type ActionMiddleware = (action: AnyFunc) => AnyFunc;
+export type ActionMeta = { name: string };
+
+export type ActionMiddleware = (action: AnyFunc, meta: ActionMeta) => AnyFunc;

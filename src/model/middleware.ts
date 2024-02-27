@@ -1,5 +1,7 @@
-import { InternalAction } from "~/internal";
-import { cancellable, disposable } from "..";
+import { InternalAction } from "../internal";
+import { Cancellable, cancellable } from "../cancellable";
+import { isPromiseLike } from "../utils";
+import { disposable } from "../disposable";
 import { ActionMiddleware, AnyFunc, Equal } from "../types";
 
 export const memo =
@@ -74,4 +76,33 @@ export const apply = <T extends AnyFunc | AnyFunc[]>(
 
     modelAction.use(...middleware);
   });
+};
+
+export const restartable = (): ActionMiddleware => (action) => {
+  let cancellationToken: Cancellable | undefined;
+
+  return (...args) => {
+    cancellationToken?.cancel();
+    [cancellationToken] = cancellable(() => action(...args));
+  };
+};
+
+export const sequential = (): ActionMiddleware => (action) => {
+  let lastResult: Promise<any> | undefined;
+
+  return (...args) => {
+    const invoke = () => {
+      const result = action(...args);
+      if (isPromiseLike(result)) {
+        lastResult = result;
+      } else {
+        lastResult;
+      }
+    };
+    if (lastResult) {
+      lastResult = lastResult.finally(invoke);
+    } else {
+      invoke();
+    }
+  };
 };

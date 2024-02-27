@@ -101,7 +101,7 @@ export const createModel = <T extends StateBase>(
         if (value[NO_WRAP]) {
           propInfo = { type: "unknown", get: () => value };
         } else {
-          propInfo = createModelAction(value, privateProxy);
+          propInfo = createModelAction(prop, value, privateProxy);
         }
       } else {
         const getValue = get ?? (() => getPersistedValue(prop, value));

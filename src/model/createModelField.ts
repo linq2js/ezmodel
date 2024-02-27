@@ -1,4 +1,4 @@
-import { ValueProp } from "~/internal";
+import { ValueProp } from "../internal";
 
 export const createModelField = <T>(
   getState: () => T,

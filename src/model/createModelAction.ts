@@ -2,13 +2,15 @@ import { async } from "../async";
 import { emitter } from "../emitter";
 import { ActionProp, InternalAction } from "../internal";
 import { trackable } from "../trackable";
-import { ActionMiddleware, AnyFunc, AsyncResult } from "../types";
+import { ActionMeta, ActionMiddleware, AnyFunc, AsyncResult } from "../types";
 import { isPromiseLike } from "../utils";
 
 export const createModelAction = <T, A extends any[]>(
+  name: string,
   dispatch: (...args: A) => T,
   proxy: T
 ): ActionProp => {
+  const meta: ActionMeta = { name };
   let prevResult: T | undefined;
   let current:
     | {
@@ -74,7 +76,7 @@ export const createModelAction = <T, A extends any[]>(
       },
       use(...middleware: ActionMiddleware[]) {
         middleware.forEach((m) => {
-          invoke = m(invoke);
+          invoke = m(invoke, meta);
         });
       },
     }

@@ -4,9 +4,6 @@ module.exports = {
   testEnvironment: "jsdom",
   cacheDirectory: "<rootDir>/jest_cache",
   moduleFileExtensions: ["js", "ts", "tsx"],
-  moduleNameMapper: {
-    "~/(.*)$": "<rootDir>/src/$1",
-  },
   restoreMocks: true,
   testMatch: ["<rootDir>/src/**/?(*.)spec.{js,ts,tsx}"],
   testPathIgnorePatterns: [
