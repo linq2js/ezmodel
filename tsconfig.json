@@ -22,7 +22,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    "baseUrl": "./",
     "outDir": "./dist"
   },
   "include": ["src"],

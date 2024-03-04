@@ -112,7 +112,9 @@ export const isPromiseLike = <T>(value: any): value is Promise<T> => {
   return value && typeof value.then === "function";
 };
 
-export const isPlainObject = (value: any) => {
+export const isPlainObject = (
+  value: any
+): value is Record<string | symbol, any> => {
   if (typeof value !== "object" || value === null) {
     return false; // Not an object or is null
   }

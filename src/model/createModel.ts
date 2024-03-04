@@ -31,7 +31,7 @@ import {
   ModelType,
   NonFunctionProps,
 } from "../types";
-import { NOOP, equal } from "../utils";
+import { NOOP, equal, isPromiseLike } from "../utils";
 import { createModelField } from "./createModelField";
 
 export type DisposeFn = {
@@ -195,7 +195,7 @@ export const createModel = <T extends StateBase>(
 
   descriptorsReady = true;
 
-  const saveWrapper = save ? () => save(privateProxy) : undefined;
+  const saveWrapper = save ? () => save(privateProxy, options.key) : undefined;
 
   type Part = {
     get(): any;
@@ -296,7 +296,13 @@ export const createModel = <T extends StateBase>(
   };
   const getPersistedValue = (prop: string, defaultValue: any) => {
     if (!persistedValues) {
-      persistedValues = load ? load(privateProxy) ?? {} : {};
+      const loadResult = load ? load(privateProxy, options.key) ?? {} : {};
+
+      persistedValues =
+        (typeof loadResult === "string"
+          ? JSON.parse(loadResult)
+          : loadResult) || {};
+
       sanitize?.(persistedValues, privateProxy);
     }
     if (!(prop in persistedValues)) {
@@ -445,6 +451,7 @@ export const createModel = <T extends StateBase>(
   };
 
   const [{ dispose: initDispose }] = disposable(() => {
+    // let all tags know the model is created
     tags?.forEach((tag) => {
       const tagDispose = tag.init(privateProxy);
       if (typeof tagDispose === "function") {
@@ -453,9 +460,18 @@ export const createModel = <T extends StateBase>(
     });
 
     if (init) {
-      const dispose = init.call(privateProxy);
-      if (typeof dispose === "function") {
-        onDispose.on(dispose);
+      const initResult = init.call(privateProxy);
+      if (typeof initResult === "function") {
+        onDispose.on(initResult);
+      }
+      // support async init
+      else if (isPromiseLike(initResult)) {
+        // the resolved value may be dispose function
+        api.initPromise = initResult.then((maybeDispose) => {
+          if (typeof maybeDispose === "function") {
+            onDispose.on(maybeDispose as VoidFunction);
+          }
+        });
       }
     }
   });

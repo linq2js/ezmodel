@@ -1,5 +1,6 @@
 /* eslint-disable max-nested-callbacks */
-import { all, async, loadable, race, wait } from "./async";
+import { all, async, delay, loadable, race, wait } from "./async";
+import { model } from "./model";
 
 describe("async", () => {
   test("no need to wait if all promises are resolved", () => {
@@ -80,6 +81,22 @@ describe("loadable", () => {
     });
     expect(a).rejects.toEqual("invalid");
   });
+
+  test("loadable: model", async () => {
+    const m1 = model({
+      init: () => delay(10),
+    });
+    const m2 = model({
+      init() {},
+    });
+    const [l1, l2] = loadable([m1, m2]);
+
+    expect(l1.loading).toBeTruthy();
+    expect(l2.loading).toBeFalsy();
+    await delay(20);
+    expect(l1.loading).toBeFalsy();
+    expect(l2.loading).toBeFalsy();
+  });
 });
 
 describe("wait", () => {
@@ -94,5 +111,20 @@ describe("wait", () => {
 
   test("wait: error", () => {
     expect(() => wait(async.reject("error"))).toThrow("error");
+  });
+
+  test("wait: model", async () => {
+    const m1 = model({
+      init: () => delay(10),
+    });
+    const m2 = model({
+      init() {},
+    });
+    expect(() => wait(m1)).toThrow();
+    wait(m2);
+    expect(() => wait([m1, m2])).toThrow();
+    await delay(10);
+    wait(m1);
+    wait([m1, m2]);
   });
 });

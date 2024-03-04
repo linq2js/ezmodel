@@ -1,8 +1,9 @@
 /* eslint-disable max-lines */
 import { cancellable } from "./cancellable";
+import { getModelApi } from "./getModelApi";
 import { scope } from "./scope";
 import { trackable } from "./trackable";
-import { AnyFunc, AsyncResult, Dictionary, Loadable } from "./types";
+import { AnyFunc, AsyncResult, Dictionary, Loadable, Model } from "./types";
 import { NOOP, isPromiseLike } from "./utils";
 
 export type Defer<T> = AsyncResult<T> & {
@@ -13,6 +14,7 @@ export type Defer<T> = AsyncResult<T> & {
 export type Awaitable<T = any> =
   | (() => T | PromiseLike<T>)
   | PromiseLike<T>
+  | Model<any>
   | undefined;
 
 export type AwaitableGroup<T = any> =
@@ -61,15 +63,17 @@ export type AllFn = {
   ): AsyncResult<S | F>;
 };
 
-export type WaitFn = <A extends AwaitableGroup | Exclude<Awaitable, undefined>>(
-  awaitable: A
-) => AwaitableData<A>;
+export type WaitFn = {
+  <A extends AwaitableGroup | Exclude<Awaitable, undefined>>(
+    awaitable: A
+  ): AwaitableData<A>;
+};
 
-export type LoadableFn = <
-  T extends AwaitableGroup | Exclude<Awaitable, undefined> | undefined
->(
-  awaitable: T
-) => LoadableFnResult<NonNullable<T>>;
+export type LoadableFn = {
+  <T extends AwaitableGroup | Exclude<Awaitable, undefined> | undefined>(
+    awaitable: T
+  ): LoadableFnResult<NonNullable<T>>;
+};
 
 export type LoadableFnResult<T> = T extends Awaitable<infer D>
   ? Loadable<D>
@@ -173,6 +177,7 @@ const ASYNC_RESULT_PROP = Symbol("ezmodel.asyncResult");
 const DEFER_PROP = Symbol("ezmodel.defer");
 
 const resolveData = (key: any, value: any): ResolvedData => {
+  // resolve promise
   if (isPromiseLike(value)) {
     const ar = async(value);
     if (ar.loading) {
@@ -181,6 +186,7 @@ const resolveData = (key: any, value: any): ResolvedData => {
     return { key, data: ar.data, error: ar.error };
   }
 
+  // resolve factory
   if (typeof value === "function") {
     try {
       return resolveData(key, value());
@@ -189,6 +195,16 @@ const resolveData = (key: any, value: any): ResolvedData => {
     }
   }
 
+  // resolve model
+  if (value && typeof value === "object") {
+    const api = getModelApi(value);
+
+    if (api) {
+      return resolveData(key, api.initPromise ?? async(undefined));
+    }
+  }
+
+  // resolve normal value
   return { key, data: value };
 };
 
@@ -208,7 +224,11 @@ export const resolveAwaitable = (
   }
 
   const resolve = () => {
-    if (isPromiseLike(awaitable) || typeof awaitable === "function") {
+    if (
+      isPromiseLike(awaitable) ||
+      typeof awaitable === "function" ||
+      (awaitable && typeof awaitable === "object" && getModelApi(awaitable))
+    ) {
       return resolveSingle(resolveData(null, awaitable));
     }
 

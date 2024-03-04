@@ -1,3 +1,5 @@
+"use client";
+
 import { useLayoutEffect, useRef, useState } from "react";
 
 const DEFAULT_VERSION = 0;

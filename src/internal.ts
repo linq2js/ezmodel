@@ -68,6 +68,7 @@ export type ModelApi = {
   configure(props: Dictionary, unstable?: Dictionary | "all"): void;
   options: ModelOptions<any>;
   type: ModelType<any, any, any> | undefined;
+  initPromise?: Promise<any>;
   part(
     def: ModelPart<any, any, any>,
     name: string | undefined,

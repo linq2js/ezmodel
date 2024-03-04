@@ -13,9 +13,7 @@ module.exports = {
   ],
   slowTestThreshold: 100,
   setupFiles: ["<rootDir>/beforeTest.js"],
-  transformIgnorePatterns: [
-    // '/node_modules/(?!crypto-hash|yet-another-react-lightbox|@axon/schemautils|@axon/pdf-generator)',
-  ],
+  transformIgnorePatterns: [],
   transform: {
     "^.+\\.(t|j)sx?$": ["@swc/jest"],
   },

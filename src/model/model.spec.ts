@@ -4,7 +4,7 @@ import { z } from "zod";
 import { previous, original, peek } from "../propAccessor";
 import { effect } from "./effect";
 import { delay } from "../async";
-import { model, dispose, refresh, stale, partOf } from ".";
+import { model, dispose, refresh, stale } from ".";
 
 describe("basic usages", () => {
   test("Object.assign", () => {
@@ -734,9 +734,9 @@ describe("part", () => {
     const values = [1, 2];
     const numberPart = model.part((_: { name: string }) => values.shift());
     const app = model({ name: "App" });
-    expect(partOf(app, numberPart)).toBe(1);
-    expect(partOf(app, numberPart)).toBe(1);
-    expect(partOf(app, numberPart)).toBe(1);
+    expect(numberPart(app)).toBe(1);
+    expect(numberPart(app)).toBe(1);
+    expect(numberPart(app)).toBe(1);
   });
 
   test("unnamed part with variant", () => {
@@ -745,13 +745,41 @@ describe("part", () => {
       (_: { name: string }, variant: number) => (values.shift() ?? 0) + variant
     );
     const app = model({ name: "App" });
-    expect(partOf(app, numberPart, 1)).toBe(2);
-    expect(partOf(app, numberPart, 1)).toBe(2);
-    expect(partOf(app, numberPart, 1)).toBe(2);
+    expect(numberPart(app, 1)).toBe(2);
+    expect(numberPart(app, 1)).toBe(2);
+    expect(numberPart(app, 1)).toBe(2);
 
-    expect(partOf(app, numberPart, 2)).toBe(4);
-    expect(partOf(app, numberPart, 2)).toBe(4);
-    expect(partOf(app, numberPart, 2)).toBe(4);
+    expect(numberPart(app, 2)).toBe(4);
+    expect(numberPart(app, 2)).toBe(4);
+    expect(numberPart(app, 2)).toBe(4);
+  });
+
+  test("named part with variant", () => {
+    const values = [1, 2, 3, 4];
+    const numberPart = model.part(
+      (_: { name: string }, variant: number) => (values.shift() ?? 0) + variant
+    );
+    const app = model({ name: "App" });
+
+    // origin value is 1
+    expect(numberPart([app, "a"], 1)).toBe(2);
+    expect(numberPart([app, "a"], 1)).toBe(2);
+    expect(numberPart([app, "a"], 1)).toBe(2);
+
+    // origin value is 2
+    expect(numberPart([app, "a"], 2)).toBe(4);
+    expect(numberPart([app, "a"], 2)).toBe(4);
+    expect(numberPart([app, "a"], 2)).toBe(4);
+
+    // origin value is 3
+    expect(numberPart([app, "b"], 1)).toBe(4);
+    expect(numberPart([app, "b"], 1)).toBe(4);
+    expect(numberPart([app, "b"], 1)).toBe(4);
+
+    // origin value is 4
+    expect(numberPart([app, "b"], 2)).toBe(6);
+    expect(numberPart([app, "b"], 2)).toBe(6);
+    expect(numberPart([app, "b"], 2)).toBe(6);
   });
 });
 

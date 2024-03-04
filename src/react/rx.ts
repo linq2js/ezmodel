@@ -1,3 +1,5 @@
+"use client";
+
 import { ReactElement, createElement, memo } from "react";
 import { AnyFunc } from "../types";
 import { useComputed } from "./useComputed";

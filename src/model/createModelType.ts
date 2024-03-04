@@ -76,8 +76,10 @@ export const createModelType = <TState extends StateBase>(
           };
           const runtimeInits = new Set<AnyFunc>();
 
-          extraPropsBuilders.forEach((extra) => {
-            const props = typeof extra === "function" ? extra(proxy) : extra;
+          extraPropsBuilders.forEach((extraProps) => {
+            const props =
+              typeof extraProps === "function" ? extraProps(proxy) : extraProps;
+
             const { init, ...descriptors } = getOwnPropertyDescriptors(props);
             if (init && typeof init.value === "function") {
               runtimeInits.add(init.value);
@@ -94,17 +96,37 @@ export const createModelType = <TState extends StateBase>(
               init() {
                 const model = this;
                 const disposeFunctions: VoidFunction[] = [];
+                const promises: Promise<any>[] = [];
                 runtimeInits.forEach((init) => {
                   const result = init.call(model, model);
                   if (typeof result === "function") {
                     disposeFunctions.push(result);
+                  } else if (isPromiseLike(result)) {
+                    promises.push(result);
                   }
                 });
-                if (disposeFunctions.length) {
-                  return () => {
-                    disposeFunctions.forEach((dispose) => dispose());
-                  };
+
+                const createDisposeIfAny = () => {
+                  if (disposeFunctions.length) {
+                    return () => {
+                      disposeFunctions.forEach((dispose) => dispose());
+                    };
+                  }
+                };
+
+                if (promises.length) {
+                  return Promise.all(promises).then((resolved) => {
+                    resolved.forEach((maybeDisposeFunction) => {
+                      // is dispose function
+                      if (typeof maybeDisposeFunction === "function") {
+                        disposeFunctions.push(maybeDisposeFunction);
+                      }
+                      return createDisposeIfAny();
+                    });
+                  });
                 }
+
+                return createDisposeIfAny();
               },
             });
           }

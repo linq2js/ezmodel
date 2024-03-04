@@ -53,7 +53,6 @@ export const model: ModelFn = Object.assign(createModelFactory("normal"), {
 });
 
 // re-export
-export { partOf } from "./createModelPart";
 export { dispose, stale, refresh } from "./createModel";
 export { alter } from "./alter";
 export { effect } from "./effect";

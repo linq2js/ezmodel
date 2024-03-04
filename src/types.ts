@@ -225,18 +225,23 @@ export type ModelOptions<T> = {
    * This method will be invoked to load model persisted data until the first property access of the model occurs.
    * @returns
    */
-  load?: (model: Model<T>) => StateBase | undefined;
+  load?: (
+    model: Model<T>,
+    key?: string
+  ) => string | null | StateBase | undefined;
 
   /**
    * This method will be called to save model data to persistent storage whenever model properties have been changed.
    * @param model
    * @returns
    */
-  save?: (model: Model<T>) => void;
+  save?: (model: Model<T>, key?: string) => void;
 
   ref?: { [key in keyof T]?: any } & { key?: any };
 
   sanitize?: (data: Record<string, unknown>, model: NoInfer<Model<T>>) => void;
+
+  key?: string;
 };
 
 export type ModelKey = string | number | boolean;
@@ -371,6 +376,8 @@ export namespace Infer {
 
 export type ModelPart<TState, TPart, TVariant> = {
   readonly type: "modelPart";
+  (model: [Model<TState>, string], variant: TVariant): TPart;
+  (model: Model<TState>, variant: TVariant): TPart;
   part(state: TState, variant: TVariant): TPart;
   variant(value: TVariant): unknown;
 };
