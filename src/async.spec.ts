@@ -115,13 +115,18 @@ describe("wait", () => {
 
   test("wait: model", async () => {
     const m1 = model({
+      // async init
       init: () => delay(10),
     });
     const m2 = model({
+      // sync init
       init() {},
     });
+    // m1 is still loading
     expect(() => wait(m1)).toThrow();
+    // m2 is done
     wait(m2);
+    // Because m1 is still loading, it causes the entire process to also be in a loading state.
     expect(() => wait([m1, m2])).toThrow();
     await delay(10);
     wait(m1);
